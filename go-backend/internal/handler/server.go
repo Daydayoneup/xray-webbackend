@@ -1,6 +1,11 @@
 package handler
 
 import (
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/go-chi/chi/v5"
 	"xray-panel/internal/app"
 	"xray-panel/internal/middleware"
@@ -57,6 +62,25 @@ func (s *Server) Routes() chi.Router {
 		r.Get("/api/config", s.RawConfig)
 		r.Get("/api/topology", s.Topology)
 	})
+
+	// SPA static file serving (mirrors Python _mount_static)
+	frontendDir := "frontend_dist"
+	if info, err := os.Stat(frontendDir); err == nil && info.IsDir() {
+		assetsDir := filepath.Join(frontendDir, "assets")
+		if info, err := os.Stat(assetsDir); err == nil && info.IsDir() {
+			fs := http.FileServer(http.Dir(assetsDir))
+			r.Handle("/assets/*", http.StripPrefix("/assets/", fs))
+		}
+		// SPA fallback: non-/api/ paths → index.html
+		indexPath := filepath.Join(frontendDir, "index.html")
+		r.Handle("/*", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, "/api/") {
+				writeError(w, 404, "not found")
+				return
+			}
+			http.ServeFile(w, r, indexPath)
+		}))
+	}
 
 	return r
 }

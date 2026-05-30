@@ -1,6 +1,8 @@
 services:
-  xray-panel:
-    build: .
+  xray-panel-go:
+    build:
+      context: ..
+      dockerfile: Dockerfile.go
     ports:
       - "12017:2017"
       - "10808:10808"
