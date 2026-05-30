@@ -6,8 +6,11 @@ export const authApi = {
   changePassword: (oldp, newp) => http.put('/auth/password', { old_password: oldp, new_password: newp }),
 }
 export const subscriptionApi = {
-  get: () => http.get('/subscription'),
-  set: (url) => http.put('/subscription', { url }),
+  list: () => http.get('/subscriptions'),
+  create: (url) => http.post('/subscriptions', { url }),
+  remove: (id) => http.delete(`/subscriptions/${id}`),
+  fetch: (id) => http.post(`/subscriptions/${id}/fetch`),
+  fetchAll: () => http.post('/subscriptions/fetch-all'),
   nodes: () => http.get('/nodes'),
   test: () => http.post('/nodes/test'),
 }

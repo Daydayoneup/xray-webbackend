@@ -8,7 +8,7 @@ const panel = usePanel()
 const nodes = ref([])
 const inbounds = ref([])
 const routing = ref({ rules: [], default_outbound: '' })
-const sub = ref({})
+const subs = ref([])
 const topo = ref({ applied: false, outbounds: [], routing: [] })
 
 const stats = computed(() => aliveStats(nodes.value))
@@ -17,15 +17,19 @@ const defaultLabel = computed(() => {
   const o = panel.outbounds.find((x) => x.tag === routing.value.default_outbound)
   return o ? o.label : (routing.value.default_outbound || '—')
 })
+const subLabel = computed(() => {
+  if (!subs.value.length) return '未配置'
+  return subs.value.map(s => s.remarks || s.url?.slice(0, 20)).join(', ')
+})
 
 onMounted(async () => {
   await panel.refreshAll()
-  const [n, ib, rt, s, tp] = await Promise.all([
+  const [n, ib, rt, sl, tp] = await Promise.all([
     subscriptionApi.nodes(), inboundApi.list(), routingApi.get(),
-    subscriptionApi.get(), xrayApi.topology(),
+    subscriptionApi.list(), xrayApi.topology(),
   ])
   nodes.value = n.data; inbounds.value = ib.data; routing.value = rt.data
-  sub.value = s.data; topo.value = tp.data
+  subs.value = sl.data; topo.value = tp.data
 })
 </script>
 
@@ -45,8 +49,8 @@ onMounted(async () => {
     <el-card><div class="lab">入站</div><div class="val">{{ inbounds.length }}</div></el-card>
     <el-card><div class="lab">出站合计</div><div class="val">{{ panel.outbounds.filter(o => o.kind !== 'builtin').length }}</div></el-card>
     <el-card><div class="lab">分流规则</div><div class="val">{{ enabledRules }} <span class="sub">/ {{ routing.rules.length }}</span></div></el-card>
-    <el-card><div class="lab">订阅</div><div class="val sm">{{ sub.remarks || '未配置' }}</div>
-      <div class="sub" v-if="sub.fetched_at">拉取于 {{ new Date(sub.fetched_at * 1000).toLocaleString() }}</div></el-card>
+    <el-card><div class="lab">订阅</div><div class="val sm">{{ subLabel }}</div>
+      <div class="sub" v-if="subs.length">共 {{ subs.length }} 个</div></el-card>
   </div>
 
   <div class="tables">

@@ -5,11 +5,11 @@ import { authApi, subscriptionApi, xrayApi } from '../api/index.js'
 import { apiError, setToken } from '../api/http.js'
 
 const pw = reactive({ old_password: '', new_password: '' })
-const sub = ref({})
+const subs = ref([])
 const rawConfig = ref('')
 
 async function load() {
-  sub.value = (await subscriptionApi.get()).data
+  try { subs.value = (await subscriptionApi.list()).data } catch (_) { subs.value = [] }
   try { rawConfig.value = JSON.stringify((await xrayApi.config()).data, null, 2) }
   catch (_) { rawConfig.value = '(尚未应用过配置)' }
 }
@@ -21,6 +21,10 @@ async function changePw() {
     if (data.token) setToken(data.token)
     pw.old_password = ''; pw.new_password = ''; ElMessage.success('密码已修改')
   } catch (e) { ElMessage.error(apiError(e)) }
+}
+function fmtTime(ts) {
+  if (!ts) return '—'
+  return new Date(ts * 1000).toLocaleString()
 }
 </script>
 
@@ -35,10 +39,13 @@ async function changePw() {
   </el-card>
 
   <el-card style="margin-top:16px;">
-    <template #header>订阅信息</template>
-    <p>链接:{{ sub.url || '—' }}</p>
-    <p>备注:{{ sub.remarks || '—' }} {{ sub.status }}</p>
-    <p v-if="sub.fetched_at">拉取于:{{ new Date(sub.fetched_at * 1000).toLocaleString() }}</p>
+    <template #header>订阅信息 ({{ subs.length }})</template>
+    <el-table :data="subs" size="small" v-if="subs.length">
+      <el-table-column prop="remarks" label="备注" width="140"><template #default="{ row }">{{ row.remarks || '—' }}</template></el-table-column>
+      <el-table-column prop="url" label="链接" show-overflow-tooltip />
+      <el-table-column label="拉取时间" width="170"><template #default="{ row }">{{ fmtTime(row.fetched_at) }}</template></el-table-column>
+    </el-table>
+    <p v-else>暂无订阅</p>
   </el-card>
 
   <el-card style="margin-top:16px;">
