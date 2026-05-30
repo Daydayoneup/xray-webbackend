@@ -115,7 +115,7 @@ func buildProxy(body *model.ProxyIn) (*model.Proxy, error) {
 		Link:     strings.TrimSpace(body.Link),
 	}
 
-	// 如果提供了 share link，解析完整 outbound
+	// link paste path — parse share link, extract full outbound
 	if px.Link != "" {
 		links, _ := service.ExtractLinks(px.Link)
 		if len(links) == 0 {
@@ -137,8 +137,9 @@ func buildProxy(body *model.ProxyIn) (*model.Proxy, error) {
 		return px, nil
 	}
 
-	// socks/http: 需要 host
-	if px.Protocol == "socks" || px.Protocol == "http" {
+	// manual fill path
+	switch px.Protocol {
+	case "socks", "http":
 		if px.Host == "" {
 			return nil, fmt.Errorf("代理地址(host)不能为空")
 		}
@@ -146,8 +147,48 @@ func buildProxy(body *model.ProxyIn) (*model.Proxy, error) {
 			return nil, fmt.Errorf("端口不能为0")
 		}
 		return px, nil
+	case "vmess", "vless", "trojan", "shadowsocks":
+		if body.Host == "" {
+			return nil, fmt.Errorf("地址不能为空")
+		}
+		if body.Port == 0 {
+			return nil, fmt.Errorf("端口不能为空")
+		}
+		if body.UUID == "" && body.Protocol != "shadowsocks" {
+			return nil, fmt.Errorf("%s 需要填写 UUID/密码", body.Protocol)
+		}
+		if body.Protocol == "shadowsocks" {
+			if body.Method == "" {
+				return nil, fmt.Errorf("shadowsocks 需要选择加密方式")
+			}
+			if body.UUID == "" {
+				return nil, fmt.Errorf("shadowsocks 需要填写密码")
+			}
+			px.RawOutbound = service.BuildSSOutbound(px.Host, px.Port, body.Method, body.UUID)
+			return px, nil
+		}
+		stream := service.StreamOpts{
+			Network:       body.Network,
+			Security:      body.TLS,
+			SNI:           body.SNI,
+			Path:          body.Path,
+			Host:          body.WsHost,
+			Fingerprint:   body.Fingerprint,
+			PublicKey:     body.PublicKey,
+			ShortId:       body.ShortId,
+			SpiderX:       body.SpiderX,
+			AllowInsecure: body.AllowInsecure,
+		}
+		switch body.Protocol {
+		case "vmess":
+			px.RawOutbound = service.BuildVMessOutbound(px.Host, px.Port, body.UUID, stream)
+		case "vless":
+			px.RawOutbound = service.BuildVLessOutbound(px.Host, px.Port, body.UUID, body.Flow, stream)
+		case "trojan":
+			px.RawOutbound = service.BuildTrojanOutbound(px.Host, px.Port, body.UUID, stream)
+		}
+		return px, nil
+	default:
+		return nil, fmt.Errorf("不支持的协议: %s", px.Protocol)
 	}
-
-	// vmess/vless/trojan/shadowsocks 但没有提供 link
-	return nil, fmt.Errorf("请粘贴 %s 分享链接自动解析", px.Protocol)
 }
