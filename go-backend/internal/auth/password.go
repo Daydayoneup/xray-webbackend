@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 
 	"golang.org/x/crypto/pbkdf2"
@@ -39,5 +40,5 @@ func VerifyPassword(rec *model.PasswordRec, pw string) bool {
 	if err != nil {
 		return false
 	}
-	return calc.Hash == rec.Hash
+	return subtle.ConstantTimeCompare([]byte(calc.Hash), []byte(rec.Hash)) == 1
 }
