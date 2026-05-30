@@ -63,7 +63,7 @@ func (s *jsonStore) Save(state *model.PanelState) error {
 		return fmt.Errorf("序列化失败: %w", err)
 	}
 	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0644); err != nil {
+	if err := os.WriteFile(tmp, data, 0600); err != nil {
 		return fmt.Errorf("写入临时文件失败: %w", err)
 	}
 	if err := os.Rename(tmp, s.path); err != nil {

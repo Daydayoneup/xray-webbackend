@@ -36,7 +36,7 @@ func (s *Server) Apply(w http.ResponseWriter, r *http.Request) {
 	path := s.App.Config().ConfigPath
 	data, _ := json.MarshalIndent(cfg, "", "  ")
 	tmp := path + ".tmp"
-	os.WriteFile(tmp, data, 0644)
+	os.WriteFile(tmp, data, 0600)
 	os.Rename(tmp, path)
 	running := s.App.Xray().Restart(path)
 	writeJSON(w, 200, map[string]any{"ok": true, "xray_running": running})

@@ -79,7 +79,7 @@ func (x *xrayProc) Restart(configPath string) bool {
 func (x *xrayProc) TestConfig(cfgJSON []byte) (bool, string) {
 	os.MkdirAll(x.workdir, 0755)
 	tmp := filepath.Join(x.workdir, "config.test.json")
-	if err := os.WriteFile(tmp, cfgJSON, 0644); err != nil {
+	if err := os.WriteFile(tmp, cfgJSON, 0600); err != nil {
 		return false, fmt.Sprintf("写入测试配置失败: %v", err)
 	}
 	defer os.Remove(tmp)
