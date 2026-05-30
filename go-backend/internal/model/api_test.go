@@ -56,4 +56,28 @@ func TestProxyInValidation(t *testing.T) {
 	if err := validate.Struct(vmess); err != nil {
 		t.Errorf("vmess with link should pass: %v", err)
 	}
+	// manual vmess with host/port/uuid should pass
+	manualVMess := ProxyIn{Protocol: "vmess", Host: "1.2.3.4", Port: 443, UUID: "test-uuid"}
+	if err := validate.Struct(manualVMess); err != nil {
+		t.Errorf("manual vmess should pass: %v", err)
+	}
+	// manual trojan with host/port/uuid should pass
+	manualTrojan := ProxyIn{Protocol: "trojan", Host: "1.2.3.4", Port: 443, UUID: "password"}
+	if err := validate.Struct(manualTrojan); err != nil {
+		t.Errorf("manual trojan should pass: %v", err)
+	}
+	// manual ss with host/port/method should pass
+	manualSS := ProxyIn{Protocol: "shadowsocks", Host: "1.2.3.4", Port: 8388, Method: "aes-256-gcm", UUID: "password"}
+	if err := validate.Struct(manualSS); err != nil {
+		t.Errorf("manual ss should pass: %v", err)
+	}
+	// manual vmess with advanced fields
+	manualAdv := ProxyIn{
+		Protocol: "vmess", Host: "1.2.3.4", Port: 443, UUID: "uuid",
+		Network: "ws", TLS: "tls", SNI: "example.com", Path: "/ws", WsHost: "example.com",
+		Fingerprint: "chrome",
+	}
+	if err := validate.Struct(manualAdv); err != nil {
+		t.Errorf("manual vmess with advanced should pass: %v", err)
+	}
 }
