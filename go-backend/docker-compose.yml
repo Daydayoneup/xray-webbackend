@@ -1,0 +1,18 @@
+services:
+  xray-panel:
+    build: .
+    ports:
+      - "12017:2017"
+      - "10808:10808"
+      - "10809:10809"
+    image: xray-panel-go:local
+    container_name: xray-panel-go
+    restart: always
+    network_mode: host
+    environment:
+      - PANEL_DATA_DIR=/data/xray
+      - PANEL_PORT=2017
+      - PANEL_PASSWORD=123321123
+      - SUBSCRIPTION_ALLOW_INTERNAL=1
+    volumes:
+      - ./data:/data/xray
