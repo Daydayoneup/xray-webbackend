@@ -8,53 +8,54 @@ import (
 )
 
 type SessionStore struct {
-	mu     sync.Mutex
 	ttl    int64
+	mu     sync.RWMutex
 	tokens map[string]int64
 }
 
-func NewSessionStore(ttl int) *SessionStore {
-	return &SessionStore{
-		ttl:    int64(ttl),
-		tokens: map[string]int64{},
-	}
+func NewSessionStore(ttl int64) *SessionStore {
+	return &SessionStore{ttl: ttl, tokens: make(map[string]int64)}
 }
 
 func (s *SessionStore) Create() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	now := time.Now().Unix()
-	for tok, exp := range s.tokens {
-		if exp <= now {
-			delete(s.tokens, tok)
-		}
-	}
 	b := make([]byte, 24)
 	rand.Read(b)
-	tok := hex.EncodeToString(b)
-	s.tokens[tok] = now + s.ttl
-	return tok
+	token := hex.EncodeToString(b)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now().Unix()
+	for t, exp := range s.tokens {
+		if exp <= now {
+			delete(s.tokens, t)
+		}
+	}
+	s.tokens[token] = now + s.ttl
+	return token
 }
 
 func (s *SessionStore) Valid(token string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
 	exp, ok := s.tokens[token]
-	if ok && exp > time.Now().Unix() {
-		return true
+	s.mu.RUnlock()
+	if !ok || exp <= time.Now().Unix() {
+		s.mu.Lock()
+		delete(s.tokens, token)
+		s.mu.Unlock()
+		return false
 	}
-	delete(s.tokens, token)
-	return false
+	return true
 }
 
 func (s *SessionStore) Revoke(token string) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	delete(s.tokens, token)
+	s.mu.Unlock()
 }
 
 func (s *SessionStore) Clear() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.tokens = map[string]int64{}
+	s.tokens = make(map[string]int64)
+	s.mu.Unlock()
 }
