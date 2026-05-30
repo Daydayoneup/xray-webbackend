@@ -1,6 +1,10 @@
 package service
 
-import "testing"
+import (
+	"testing"
+
+	"xray-panel/internal/model"
+)
 
 func TestInboundToXraySocksAuth(t *testing.T) {
 	ib := map[string]any{
@@ -67,5 +71,49 @@ func TestDescribe(t *testing.T) {
 	r := map[string]any{"domain": []string{"domain:google.com"}}
 	if d := Describe(r); d != "域名后缀 google.com" {
 		t.Errorf("describe = %s, want 域名后缀 google.com", d)
+	}
+}
+
+func TestBuildConfigMinimal(t *testing.T) {
+	state := &model.PanelState{
+		Nodes: []model.Node{
+			{Tag: "node-0", Name: "Test", Type: "vmess", Host: "1.2.3.4", Port: 443,
+				Outbound: map[string]any{"protocol": "vmess"}},
+		},
+		Inbounds: []model.Inbound{
+			{Tag: "in-0", Protocol: "socks", Listen: "0.0.0.0", Port: 10808, UDP: true},
+		},
+		DefaultOutbound: "node-0",
+	}
+	cfg := BuildConfig(state)
+	outbounds := cfg["outbounds"].([]any)
+	if len(outbounds) < 3 {
+		t.Fatalf("expected >= 3 outbounds, got %d", len(outbounds))
+	}
+}
+
+func TestBuildConfigWithBalancers(t *testing.T) {
+	state := &model.PanelState{
+		Nodes: []model.Node{
+			{Tag: "node-0", Name: "N1", Type: "vmess", Host: "1.1.1.1", Port: 443,
+				Outbound: map[string]any{"protocol": "vmess"}},
+			{Tag: "node-1", Name: "N2", Type: "vless", Host: "2.2.2.2", Port: 443,
+				Outbound: map[string]any{"protocol": "vless"}},
+		},
+		Balancers: []model.Balancer{
+			{Tag: "auto-0", Name: "Auto", Nodes: []string{"node-0", "node-1"}, Strategy: "leastPing"},
+		},
+		Inbounds: []model.Inbound{
+			{Tag: "in-0", Protocol: "socks", Listen: "0.0.0.0", Port: 10808},
+		},
+		DefaultOutbound: "auto-0",
+	}
+	cfg := BuildConfig(state)
+	routing := cfg["routing"].(map[string]any)
+	if _, ok := routing["balancers"]; !ok {
+		t.Error("balancers should exist in routing")
+	}
+	if _, ok := cfg["observatory"]; !ok {
+		t.Error("observatory should exist when balancers are configured")
 	}
 }
