@@ -117,3 +117,76 @@ func TestBuildConfigWithBalancers(t *testing.T) {
 		t.Error("observatory should exist when balancers are configured")
 	}
 }
+
+func TestBuildVMessOutbound(t *testing.T) {
+	ob := BuildVMessOutbound("1.2.3.4", 443, "test-uuid", StreamOpts{
+		Network: "ws", Security: "tls", SNI: "example.com", Path: "/ws",
+	})
+	if ob["protocol"] != "vmess" {
+		t.Errorf("protocol = %v", ob["protocol"])
+	}
+	settings := ob["settings"].(map[string]any)
+	vnext := settings["vnext"].([]any)
+	first := vnext[0].(map[string]any)
+	if first["address"] != "1.2.3.4" {
+		t.Errorf("address = %v", first["address"])
+	}
+	stream := ob["streamSettings"].(map[string]any)
+	if stream["security"] != "tls" {
+		t.Errorf("security = %v", stream["security"])
+	}
+}
+
+func TestBuildVLessOutbound(t *testing.T) {
+	ob := BuildVLessOutbound("2.2.2.2", 443, "uuid", "xtls-rprx-vision", StreamOpts{
+		Network: "tcp", Security: "reality", SNI: "yahoo.com",
+		Fingerprint: "chrome", PublicKey: "pubkey", ShortId: "abc",
+	})
+	if ob["protocol"] != "vless" {
+		t.Errorf("protocol = %v", ob["protocol"])
+	}
+	stream := ob["streamSettings"].(map[string]any)
+	if stream["security"] != "reality" {
+		t.Errorf("security = %v", stream["security"])
+	}
+	rs := stream["realitySettings"].(map[string]any)
+	if rs["publicKey"] != "pubkey" {
+		t.Errorf("publicKey = %v", rs["publicKey"])
+	}
+}
+
+func TestBuildTrojanOutbound(t *testing.T) {
+	ob := BuildTrojanOutbound("3.3.3.3", 443, "password", StreamOpts{
+		Network: "grpc", Security: "tls", SNI: "example.com", Path: "myservice",
+	})
+	if ob["protocol"] != "trojan" {
+		t.Errorf("protocol = %v", ob["protocol"])
+	}
+	stream := ob["streamSettings"].(map[string]any)
+	if stream["network"] != "grpc" {
+		t.Errorf("network = %v", stream["network"])
+	}
+}
+
+func TestBuildSSOutbound(t *testing.T) {
+	ob := BuildSSOutbound("4.4.4.4", 8388, "aes-256-gcm", "password")
+	if ob["protocol"] != "shadowsocks" {
+		t.Errorf("protocol = %v", ob["protocol"])
+	}
+	settings := ob["settings"].(map[string]any)
+	servers := settings["servers"].([]any)
+	s := servers[0].(map[string]any)
+	if s["method"] != "aes-256-gcm" {
+		t.Errorf("method = %v", s["method"])
+	}
+}
+
+func TestBuildStreamSettingsDefaults(t *testing.T) {
+	stream := BuildStreamSettings(StreamOpts{})
+	if stream["network"] != "tcp" {
+		t.Errorf("default network should be tcp, got %v", stream["network"])
+	}
+	if stream["security"] != "none" {
+		t.Errorf("default security should be none, got %v", stream["security"])
+	}
+}
