@@ -137,47 +137,18 @@ func parseVMess(link string) (NodeRaw, error) {
 	if path == "" {
 		path = "/"
 	}
-	stream := buildStreamSettings(net, tls, sni, path, v.Host)
-	outbound := map[string]any{
-		"protocol": "vmess",
-		"settings": map[string]any{
-			"vnext": []any{
-				map[string]any{
-					"address": v.Add, "port": port,
-					"users": []any{
-						map[string]any{
-							"id": v.ID, "alterId": toInt(v.AID),
-							"security": selStr(v.Scy, "auto"),
-						},
-					},
-				},
-			},
-		},
-		"streamSettings": stream,
-	}
+	outbound := BuildVMessOutbound(v.Add, port, v.ID, StreamOpts{
+		Network:  net,
+		Security: tls,
+		SNI:      sni,
+		Path:     path,
+		Host:     v.Host,
+	})
 	name := v.PS
 	if name == "" {
 		name = v.Add
 	}
 	return NodeRaw{Name: name, Type: "vmess", Host: v.Add, Port: port, Outbound: outbound}, nil
-}
-
-func buildStreamSettings(net, tls, sni, path, host string) map[string]any {
-	stream := map[string]any{"network": net}
-	if tls == "reality" {
-		stream["security"] = "reality"
-	} else if tls == "tls" {
-		stream["security"] = "tls"
-		stream["tlsSettings"] = map[string]any{"serverName": sni, "allowInsecure": false}
-	} else {
-		stream["security"] = "none"
-	}
-	if net == "ws" {
-		stream["wsSettings"] = map[string]any{"path": path, "headers": map[string]any{"Host": host}}
-	} else if net == "grpc" {
-		stream["grpcSettings"] = map[string]any{"serviceName": strings.TrimPrefix(path, "/")}
-	}
-	return stream
 }
 
 // ---- VLess ----
@@ -189,9 +160,8 @@ func parseVLess(link string) (NodeRaw, error) {
 	}
 	q := u.Query()
 	host := u.Hostname()
-	portStr := u.Port()
 	port := 443
-	if p, err := strconv.Atoi(portStr); err == nil && p > 0 {
+	if p, err := strconv.Atoi(u.Port()); err == nil && p > 0 {
 		port = p
 	}
 	net := q.Get("type")
@@ -202,45 +172,22 @@ func parseVLess(link string) (NodeRaw, error) {
 	if security == "" {
 		security = "none"
 	}
-	stream := map[string]any{"network": net}
-	if security == "tls" {
-		sni := q.Get("sni")
-		if sni == "" {
-			sni = host
-		}
-		stream["security"] = "tls"
-		stream["tlsSettings"] = map[string]any{"serverName": sni, "allowInsecure": q.Get("allowInsecure") == "1"}
-	} else if security == "reality" {
-		stream["security"] = "reality"
-		stream["realitySettings"] = map[string]any{
-			"serverName": q.Get("sni"), "fingerprint": selStr(q.Get("fp"), "chrome"),
-			"publicKey": q.Get("pbk"), "shortId": q.Get("sid"), "spiderX": q.Get("spx"),
-		}
-	} else {
-		stream["security"] = "none"
+	sni := q.Get("sni")
+	if sni == "" && security != "none" {
+		sni = host
 	}
-	if net == "ws" {
-		stream["wsSettings"] = map[string]any{"path": q.Get("path"), "headers": map[string]any{"Host": q.Get("host")}}
-	} else if net == "grpc" {
-		svc := q.Get("serviceName")
-		if svc == "" {
-			svc = q.Get("path")
-		}
-		stream["grpcSettings"] = map[string]any{"serviceName": svc}
-	}
-	user := map[string]any{"id": u.User.Username(), "encryption": selStr(q.Get("encryption"), "none")}
-	if flow := q.Get("flow"); flow != "" {
-		user["flow"] = flow
-	}
-	outbound := map[string]any{
-		"protocol": "vless",
-		"settings": map[string]any{
-			"vnext": []any{
-				map[string]any{"address": host, "port": port, "users": []any{user}},
-			},
-		},
-		"streamSettings": stream,
-	}
+	outbound := BuildVLessOutbound(host, port, u.User.Username(), q.Get("flow"), StreamOpts{
+		Network:       net,
+		Security:      security,
+		SNI:           sni,
+		Path:          q.Get("path"),
+		Host:          q.Get("host"),
+		Fingerprint:   q.Get("fp"),
+		PublicKey:     q.Get("pbk"),
+		ShortId:       q.Get("sid"),
+		SpiderX:       q.Get("spx"),
+		AllowInsecure: q.Get("allowInsecure") == "1",
+	})
 	name := u.Fragment
 	if name == "" {
 		name = host
@@ -257,9 +204,8 @@ func parseTrojan(link string) (NodeRaw, error) {
 	}
 	q := u.Query()
 	host := u.Hostname()
-	portStr := u.Port()
 	port := 443
-	if p, err := strconv.Atoi(portStr); err == nil && p > 0 {
+	if p, err := strconv.Atoi(u.Port()); err == nil && p > 0 {
 		port = p
 	}
 	sni := q.Get("sni")
@@ -273,23 +219,14 @@ func parseTrojan(link string) (NodeRaw, error) {
 	if net == "" {
 		net = "tcp"
 	}
-	allowInsecure := q.Get("allowInsecure") == "1"
-	stream := map[string]any{
-		"network": net, "security": "tls",
-		"tlsSettings": map[string]any{"serverName": sni, "allowInsecure": allowInsecure},
-	}
-	if net == "ws" {
-		stream["wsSettings"] = map[string]any{"path": q.Get("path"), "headers": map[string]any{"Host": q.Get("host")}}
-	}
-	outbound := map[string]any{
-		"protocol": "trojan",
-		"settings": map[string]any{
-			"servers": []any{
-				map[string]any{"address": host, "port": port, "password": u.User.Username()},
-			},
-		},
-		"streamSettings": stream,
-	}
+	outbound := BuildTrojanOutbound(host, port, u.User.Username(), StreamOpts{
+		Network:       net,
+		Security:      "tls",
+		SNI:           sni,
+		Path:          q.Get("path"),
+		Host:          q.Get("host"),
+		AllowInsecure: q.Get("allowInsecure") == "1",
+	})
 	name := u.Fragment
 	if name == "" {
 		name = host
@@ -340,14 +277,7 @@ func parseSS(link string) (NodeRaw, error) {
 	}
 	host := hostPort[0]
 	port := toInt(hostPort[1])
-	outbound := map[string]any{
-		"protocol": "shadowsocks",
-		"settings": map[string]any{
-			"servers": []any{
-				map[string]any{"address": host, "port": port, "method": method, "password": password},
-			},
-		},
-	}
+	outbound := BuildSSOutbound(host, port, method, password)
 	name, _ := url.QueryUnescape(frag)
 	if name == "" {
 		name = host
