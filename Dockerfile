@@ -10,14 +10,13 @@ COPY frontend/ ./
 RUN npm run build
 
 # 3) 构建 Go 后端
-FROM golang:alpine AS builder
+FROM golang:latest AS builder
 RUN apk add --no-cache ca-certificates
 WORKDIR /build
 COPY go-backend/go.mod go-backend/go.sum ./
-ENV GOTOOLCHAIN=auto
-RUN go mod download
+RUN go env -w GOTOOLCHAIN=auto && go mod download
 COPY go-backend/ ./
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o xray-panel ./cmd/server
+RUN go env -w GOTOOLCHAIN=auto && CGO_ENABLED=0 go build -ldflags="-s -w" -o xray-panel ./cmd/server
 
 # 4) 极简运行时
 FROM scratch

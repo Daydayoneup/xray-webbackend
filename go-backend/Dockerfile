@@ -1,12 +1,12 @@
 FROM ghcr.io/xtls/xray-core:latest AS xray
 
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 RUN apk add --no-cache ca-certificates
 WORKDIR /build
 COPY go.mod go.sum ./
-RUN go mod download
+RUN go env -w GOTOOLCHAIN=auto && go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o xray-panel ./cmd/server
+RUN go env -w GOTOOLCHAIN=auto && CGO_ENABLED=0 go build -ldflags="-s -w" -o xray-panel ./cmd/server
 
 FROM scratch
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
