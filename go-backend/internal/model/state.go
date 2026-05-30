@@ -38,6 +38,7 @@ type PasswordRec struct {
 }
 
 type Subscription struct {
+	ID        int    `json:"id"`
 	URL       string `json:"url"`
 	Remarks   string `json:"remarks"`
 	Status    string `json:"status"`
@@ -88,15 +89,16 @@ type Rule struct {
 }
 
 type PanelState struct {
-	Password        *PasswordRec  `json:"password,omitempty"`
-	Subscription    Subscription  `json:"subscription"`
-	Nodes           []Node        `json:"nodes"`
-	Inbounds        []Inbound     `json:"inbounds"`
-	Proxies         []Proxy       `json:"proxies"`
-	Balancers       []Balancer    `json:"balancers"`
-	Rules           []Rule        `json:"rules"`
-	DefaultOutbound string        `json:"default_outbound"`
-	InboundSeq      int           `json:"inbound_seq"`
-	ProxySeq        int           `json:"proxy_seq"`
-	BalancerSeq     int           `json:"balancer_seq"`
+	Password        *PasswordRec   `json:"password,omitempty"`
+	Subscriptions   []Subscription `json:"subscriptions"`
+	Nodes           []Node         `json:"nodes"`
+	Inbounds        []Inbound      `json:"inbounds"`
+	Proxies         []Proxy        `json:"proxies"`
+	Balancers       []Balancer     `json:"balancers"`
+	Rules           []Rule         `json:"rules"`
+	DefaultOutbound string         `json:"default_outbound"`
+	InboundSeq      int            `json:"inbound_seq"`
+	ProxySeq        int            `json:"proxy_seq"`
+	BalancerSeq     int            `json:"balancer_seq"`
+	SubSeq          int            `json:"sub_seq"`
 }

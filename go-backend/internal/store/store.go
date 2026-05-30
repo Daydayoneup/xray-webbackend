@@ -93,6 +93,9 @@ func migrate(raw map[string]any, socksPort, httpPort int) *model.PanelState {
 	setDefaultSeq(raw, "proxy_seq", raw["proxies"].([]any), "px-")
 	setDefaultSeq(raw, "balancer_seq", raw["balancers"].([]any), "auto-")
 
+	// 迁移旧单订阅格式 → 多订阅数组
+	migrateSubscriptions(raw)
+
 	data, _ := json.Marshal(raw)
 	var state model.PanelState
 	json.Unmarshal(data, &state)
@@ -153,4 +156,26 @@ func asMap(v any) map[string]any {
 		return map[string]any{}
 	}
 	return m
+}
+
+func migrateSubscriptions(raw map[string]any) {
+	// 已经是新格式（subscriptions 数组）
+	if _, ok := raw["subscriptions"]; ok {
+		delete(raw, "subscription") // 清除旧 key
+		setDefaultSeq(raw, "sub_seq", raw["subscriptions"].([]any), "")
+		return
+	}
+	// 旧格式: subscription 是单个对象 → 转成 subscriptions 数组
+	if old, ok := raw["subscription"].(map[string]any); ok && len(old) > 0 {
+		if old["url"] != nil && old["url"] != "" {
+			old["id"] = float64(0)
+			raw["subscriptions"] = []any{old}
+		} else {
+			raw["subscriptions"] = []any{}
+		}
+	} else {
+		raw["subscriptions"] = []any{}
+	}
+	delete(raw, "subscription")
+	setDefaultSeq(raw, "sub_seq", raw["subscriptions"].([]any), "")
 }

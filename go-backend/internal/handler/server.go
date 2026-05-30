@@ -51,8 +51,11 @@ func (s *Server) Routes() chi.Router {
 		r.Get("/api/routing/templates", s.Templates)
 		r.Get("/api/outbounds", s.Outbounds)
 
-		r.Get("/api/subscription", s.GetSubscription)
-		r.Put("/api/subscription", s.SetSubscription)
+		r.Get("/api/subscriptions", s.ListSubscriptions)
+		r.Post("/api/subscriptions", s.CreateSubscription)
+		r.Delete("/api/subscriptions/{id}", s.DeleteSubscription)
+		r.Post("/api/subscriptions/{id}/fetch", s.FetchSubscription)
+		r.Post("/api/subscriptions/fetch-all", s.FetchAllSubscriptions)
 		r.Get("/api/nodes", s.ListNodes)
 		r.Post("/api/nodes/test", s.TestNodes)
 

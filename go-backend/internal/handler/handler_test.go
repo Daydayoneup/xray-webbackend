@@ -19,7 +19,7 @@ type memStore struct {
 func (m *memStore) Load() (*model.PanelState, error) {
 	if m.state == nil {
 		m.state = &model.PanelState{
-			Subscription: model.Subscription{},
+			Subscriptions: []model.Subscription{},
 			Inbounds: []model.Inbound{
 				{Tag: "in-0", Protocol: "socks", Listen: "0.0.0.0", Port: 10808, UDP: true},
 				{Tag: "in-1", Protocol: "http", Listen: "0.0.0.0", Port: 10809},
