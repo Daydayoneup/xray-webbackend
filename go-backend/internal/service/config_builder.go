@@ -25,14 +25,20 @@ func BuildConfig(state *model.PanelState) map[string]any {
 		outbounds = append(outbounds, ob)
 	}
 	for _, p := range state.Proxies {
-		ob := ProxyToXray(map[string]any{
-			"tag": p.Tag, "protocol": p.Protocol, "host": p.Host, "port": p.Port,
-		})
-		if p.Auth != nil {
-			ob["settings"].(map[string]any)["servers"].([]any)[0].(map[string]any)["users"] = []any{
-				map[string]any{"user": p.Auth.User, "pass": p.Auth.Password},
+		var ob map[string]any
+		if p.RawOutbound != nil {
+			ob = deepCopyMap(p.RawOutbound)
+		} else {
+			ob = ProxyToXray(map[string]any{
+				"tag": p.Tag, "protocol": p.Protocol, "host": p.Host, "port": p.Port,
+			})
+			if p.Auth != nil {
+				ob["settings"].(map[string]any)["servers"].([]any)[0].(map[string]any)["users"] = []any{
+					map[string]any{"user": p.Auth.User, "pass": p.Auth.Password},
+				}
 			}
 		}
+		ob["tag"] = p.Tag
 		outbounds = append(outbounds, ob)
 	}
 	outbounds = append(outbounds,

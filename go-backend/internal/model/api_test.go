@@ -46,8 +46,14 @@ func TestAuthInValidation(t *testing.T) {
 }
 
 func TestProxyInValidation(t *testing.T) {
-	p := ProxyIn{Protocol: "http", Host: "", Port: 80}
-	if err := validate.Struct(p); err == nil {
-		t.Error("expected validation error for empty host")
+	// socks/http: port 0 is ok since host:port validation moved to handler
+	valid := ProxyIn{Protocol: "socks", Host: "10.0.0.1", Port: 1080}
+	if err := validate.Struct(valid); err != nil {
+		t.Errorf("valid proxy should pass: %v", err)
+	}
+	// vmess without link: allowed (handler will reject if no link)
+	vmess := ProxyIn{Protocol: "vmess", Link: "vmess://test"}
+	if err := validate.Struct(vmess); err != nil {
+		t.Errorf("vmess with link should pass: %v", err)
 	}
 }

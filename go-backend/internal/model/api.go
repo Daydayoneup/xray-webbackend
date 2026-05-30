@@ -24,10 +24,11 @@ type InboundIn struct {
 
 type ProxyIn struct {
 	Name     string  `json:"name"`
-	Protocol string  `json:"protocol" validate:"required,oneof=socks http"`
-	Host     string  `json:"host" validate:"required"`
-	Port     int     `json:"port" validate:"required,min=1,max=65535"`
+	Protocol string  `json:"protocol" validate:"required,oneof=socks http vmess vless trojan shadowsocks"`
+	Host     string  `json:"host"`
+	Port     int     `json:"port" validate:"omitempty,min=1,max=65535"`
 	Auth     *AuthIn `json:"auth" validate:"omitempty"`
+	Link     string  `json:"link"`
 }
 
 type BalancerIn struct {

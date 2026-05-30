@@ -65,12 +65,14 @@ type Inbound struct {
 }
 
 type Proxy struct {
-	Tag      string `json:"tag"`
-	Name     string `json:"name"`
-	Protocol string `json:"protocol"`
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	Auth     *Auth  `json:"auth,omitempty"`
+	Tag         string         `json:"tag"`
+	Name        string         `json:"name"`
+	Protocol    string         `json:"protocol"`
+	Host        string         `json:"host"`
+	Port        int            `json:"port"`
+	Auth        *Auth          `json:"auth,omitempty"`
+	Link        string         `json:"link,omitempty"`
+	RawOutbound map[string]any `json:"rawOutbound,omitempty"`
 }
 
 type Balancer struct {
