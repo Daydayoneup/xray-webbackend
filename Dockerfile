@@ -10,7 +10,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # 3) 构建 Go 后端
-FROM golang:latest AS builder
+FROM golang:alpine AS builder
 RUN apk add --no-cache ca-certificates
 WORKDIR /build
 COPY go-backend/go.mod go-backend/go.sum ./
