@@ -22,12 +22,14 @@ func BuildConfig(state *model.PanelState) map[string]any {
 	for _, n := range state.Nodes {
 		ob := deepCopyMap(n.Outbound)
 		ob["tag"] = n.Tag
+		stripRemovedTLSFields(ob)
 		outbounds = append(outbounds, ob)
 	}
 	for _, p := range state.Proxies {
 		var ob map[string]any
 		if p.RawOutbound != nil {
 			ob = deepCopyMap(p.RawOutbound)
+			stripRemovedTLSFields(ob)
 		} else {
 			ob = ProxyToXray(map[string]any{
 				"tag": p.Tag, "protocol": p.Protocol, "host": p.Host, "port": p.Port,
@@ -106,6 +108,19 @@ func BuildConfig(state *model.PanelState) map[string]any {
 	}
 
 	return cfg
+}
+
+// stripRemovedTLSFields removes config keys that newer Xray-core versions have
+// removed and now reject outright. Nodes/proxies parsed by older code may have
+// these baked into their persisted outbound map, so we scrub them at build time.
+func stripRemovedTLSFields(ob map[string]any) {
+	ss, ok := ob["streamSettings"].(map[string]any)
+	if !ok {
+		return
+	}
+	if ts, ok := ss["tlsSettings"].(map[string]any); ok {
+		delete(ts, "allowInsecure")
+	}
 }
 
 func deepCopyMap(src map[string]any) map[string]any {

@@ -23,28 +23,27 @@ type InboundIn struct {
 }
 
 type ProxyIn struct {
-	Name     string  `json:"name"`
-	Protocol string  `json:"protocol" validate:"required,oneof=socks http vmess vless trojan shadowsocks"`
+	Name     string `json:"name"`
+	Protocol string `json:"protocol" validate:"required,oneof=socks http vmess vless trojan shadowsocks"`
 	// socks/http manual fields
-	Host     string  `json:"host"`
-	Port     int     `json:"port" validate:"omitempty,min=1,max=65535"`
-	Auth     *AuthIn `json:"auth" validate:"omitempty"`
+	Host string  `json:"host"`
+	Port int     `json:"port" validate:"omitempty,min=1,max=65535"`
+	Auth *AuthIn `json:"auth" validate:"omitempty"`
 	// link paste
-	Link     string  `json:"link"`
+	Link string `json:"link"`
 	// manual mode — vmess/vless/trojan/ss
-	UUID          string `json:"uuid"`
-	Method        string `json:"method"`
-	Network       string `json:"network"`
-	TLS           string `json:"tls"`
-	SNI           string `json:"sni"`
-	Path          string `json:"path"`
-	WsHost        string `json:"ws_host"`
-	Flow          string `json:"flow"`
-	Fingerprint   string `json:"fingerprint"`
-	PublicKey     string `json:"public_key"`
-	ShortId       string `json:"short_id"`
-	SpiderX       string `json:"spider_x"`
-	AllowInsecure bool   `json:"allow_insecure"`
+	UUID        string `json:"uuid"`
+	Method      string `json:"method"`
+	Network     string `json:"network"`
+	TLS         string `json:"tls"`
+	SNI         string `json:"sni"`
+	Path        string `json:"path"`
+	WsHost      string `json:"ws_host"`
+	Flow        string `json:"flow"`
+	Fingerprint string `json:"fingerprint"`
+	PublicKey   string `json:"public_key"`
+	ShortId     string `json:"short_id"`
+	SpiderX     string `json:"spider_x"`
 }
 
 type BalancerIn struct {

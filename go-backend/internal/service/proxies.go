@@ -2,16 +2,15 @@ package service
 
 // StreamOpts holds transport/security parameters shared by all outbound builders.
 type StreamOpts struct {
-	Network       string // tcp, ws, grpc, h2
-	Security      string // none, tls, reality
-	SNI           string
-	Path          string
-	Host          string
-	Fingerprint   string
-	PublicKey     string
-	ShortId       string
-	SpiderX       string
-	AllowInsecure bool
+	Network     string // tcp, ws, grpc, h2
+	Security    string // none, tls, reality
+	SNI         string
+	Path        string
+	Host        string
+	Fingerprint string
+	PublicKey   string
+	ShortId     string
+	SpiderX     string
 }
 
 func BuildStreamSettings(opts StreamOpts) map[string]any {
@@ -40,7 +39,9 @@ func BuildStreamSettings(opts StreamOpts) map[string]any {
 		}
 	case "tls":
 		stream["security"] = "tls"
-		ts := map[string]any{"allowInsecure": opts.AllowInsecure}
+		// Note: allowInsecure was removed from Xray-core (migrated to
+		// pinnedPeerCertSha256); we intentionally never emit it here.
+		ts := map[string]any{}
 		sni := opts.SNI
 		if sni == "" {
 			sni = opts.Host

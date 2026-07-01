@@ -177,16 +177,15 @@ func parseVLess(link string) (NodeRaw, error) {
 		sni = host
 	}
 	outbound := BuildVLessOutbound(host, port, u.User.Username(), q.Get("flow"), StreamOpts{
-		Network:       net,
-		Security:      security,
-		SNI:           sni,
-		Path:          q.Get("path"),
-		Host:          q.Get("host"),
-		Fingerprint:   q.Get("fp"),
-		PublicKey:     q.Get("pbk"),
-		ShortId:       q.Get("sid"),
-		SpiderX:       q.Get("spx"),
-		AllowInsecure: q.Get("allowInsecure") == "1",
+		Network:     net,
+		Security:    security,
+		SNI:         sni,
+		Path:        q.Get("path"),
+		Host:        q.Get("host"),
+		Fingerprint: q.Get("fp"),
+		PublicKey:   q.Get("pbk"),
+		ShortId:     q.Get("sid"),
+		SpiderX:     q.Get("spx"),
 	})
 	name := u.Fragment
 	if name == "" {
@@ -220,12 +219,11 @@ func parseTrojan(link string) (NodeRaw, error) {
 		net = "tcp"
 	}
 	outbound := BuildTrojanOutbound(host, port, u.User.Username(), StreamOpts{
-		Network:       net,
-		Security:      "tls",
-		SNI:           sni,
-		Path:          q.Get("path"),
-		Host:          q.Get("host"),
-		AllowInsecure: q.Get("allowInsecure") == "1",
+		Network:  net,
+		Security: "tls",
+		SNI:      sni,
+		Path:     q.Get("path"),
+		Host:     q.Get("host"),
 	})
 	name := u.Fragment
 	if name == "" {

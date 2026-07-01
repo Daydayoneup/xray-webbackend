@@ -18,15 +18,18 @@ func (s *Server) ListProxies(w http.ResponseWriter, r *http.Request) {
 func (s *Server) CreateProxy(w http.ResponseWriter, r *http.Request) {
 	var body model.ProxyIn
 	if err := decodeJSON(r, &body); err != nil {
-		writeError(w, 400, "请求格式错误"); return
+		writeError(w, 400, "请求格式错误")
+		return
 	}
 	if err := validate.Struct(body); err != nil {
-		writeError(w, 400, translateValidation(err)); return
+		writeError(w, 400, translateValidation(err))
+		return
 	}
 
 	px, err := buildProxy(&body)
 	if err != nil {
-		writeError(w, 400, err.Error()); return
+		writeError(w, 400, err.Error())
+		return
 	}
 
 	s.App.Store().Lock()
@@ -48,15 +51,18 @@ func (s *Server) UpdateProxy(w http.ResponseWriter, r *http.Request) {
 	tag := chi.URLParam(r, "tag")
 	var body model.ProxyIn
 	if err := decodeJSON(r, &body); err != nil {
-		writeError(w, 400, "请求格式错误"); return
+		writeError(w, 400, "请求格式错误")
+		return
 	}
 	if err := validate.Struct(body); err != nil {
-		writeError(w, 400, translateValidation(err)); return
+		writeError(w, 400, translateValidation(err))
+		return
 	}
 
 	px, err := buildProxy(&body)
 	if err != nil {
-		writeError(w, 400, err.Error()); return
+		writeError(w, 400, err.Error())
+		return
 	}
 
 	s.App.Store().Lock()
@@ -66,11 +72,13 @@ func (s *Server) UpdateProxy(w http.ResponseWriter, r *http.Request) {
 	idx := -1
 	for i, p := range state.Proxies {
 		if p.Tag == tag {
-			idx = i; break
+			idx = i
+			break
 		}
 	}
 	if idx < 0 {
-		writeError(w, 404, fmt.Sprintf("代理 %s 不存在", tag)); return
+		writeError(w, 404, fmt.Sprintf("代理 %s 不存在", tag))
+		return
 	}
 	px.Tag = tag
 	if px.Name == "" {
@@ -97,7 +105,8 @@ func (s *Server) DeleteProxy(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !found {
-		writeError(w, 404, fmt.Sprintf("代理 %s 不存在", tag)); return
+		writeError(w, 404, fmt.Sprintf("代理 %s 不存在", tag))
+		return
 	}
 	state.Proxies = kept
 	s.App.PruneDangling()
@@ -168,16 +177,15 @@ func buildProxy(body *model.ProxyIn) (*model.Proxy, error) {
 			return px, nil
 		}
 		stream := service.StreamOpts{
-			Network:       body.Network,
-			Security:      body.TLS,
-			SNI:           body.SNI,
-			Path:          body.Path,
-			Host:          body.WsHost,
-			Fingerprint:   body.Fingerprint,
-			PublicKey:     body.PublicKey,
-			ShortId:       body.ShortId,
-			SpiderX:       body.SpiderX,
-			AllowInsecure: body.AllowInsecure,
+			Network:     body.Network,
+			Security:    body.TLS,
+			SNI:         body.SNI,
+			Path:        body.Path,
+			Host:        body.WsHost,
+			Fingerprint: body.Fingerprint,
+			PublicKey:   body.PublicKey,
+			ShortId:     body.ShortId,
+			SpiderX:     body.SpiderX,
 		}
 		switch body.Protocol {
 		case "vmess":

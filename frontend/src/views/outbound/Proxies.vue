@@ -15,7 +15,7 @@ const form = reactive({
   name: '', protocol: 'socks', host: '', port: null, user: '', pass: '',
   link: '', uuid: '', method: 'aes-256-gcm', network: 'tcp', tls: 'none',
   sni: '', path: '', wsHost: '', flow: '', fingerprint: 'chrome',
-  publicKey: '', shortId: '', spiderX: '', allowInsecure: false,
+  publicKey: '', shortId: '', spiderX: '',
 })
 
 const protocols = [
@@ -48,7 +48,7 @@ function resetForm() {
     name: '', protocol: 'socks', host: '', port: null, user: '', pass: '',
     link: '', uuid: '', method: 'aes-256-gcm', network: 'tcp', tls: 'none',
     sni: '', path: '', wsHost: '', flow: '', fingerprint: 'chrome',
-    publicKey: '', shortId: '', spiderX: '', allowInsecure: false,
+    publicKey: '', shortId: '', spiderX: '',
   })
   mode.value = 'manual'
 }
@@ -66,7 +66,7 @@ function openEdit(row) {
     user: row.auth?.user || '', pass: row.auth?.pass || '', link: row.link || '',
     uuid: '', method: 'aes-256-gcm', network: 'tcp', tls: 'none',
     sni: '', path: '', wsHost: '', flow: '', fingerprint: 'chrome',
-    publicKey: '', shortId: '', spiderX: '', allowInsecure: false,
+    publicKey: '', shortId: '', spiderX: '',
   })
   mode.value = row.link ? 'link' : 'manual'
   dialog.value = true
@@ -88,7 +88,6 @@ function payload() {
       p.path = form.path.trim()
       p.ws_host = form.wsHost.trim()
       p.fingerprint = form.fingerprint
-      p.allow_insecure = form.allowInsecure
       if (isVless.value) p.flow = form.flow.trim()
       if (isReality.value) {
         p.public_key = form.publicKey.trim()
@@ -222,9 +221,6 @@ async function remove(row) {
               </el-form-item>
               <el-form-item v-if="isReality" label="SpiderX">
                 <el-input v-model="form.spiderX" placeholder="spiderX" />
-              </el-form-item>
-              <el-form-item v-if="isTLS" label="AllowInsecure">
-                <el-switch v-model="form.allowInsecure" />
               </el-form-item>
             </el-collapse-item>
           </el-collapse>

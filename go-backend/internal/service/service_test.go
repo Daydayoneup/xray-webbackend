@@ -190,3 +190,59 @@ func TestBuildStreamSettingsDefaults(t *testing.T) {
 		t.Errorf("default security should be none, got %v", stream["security"])
 	}
 }
+
+// allowInsecure was removed from Xray-core; emitting it (even false) makes the
+// latest xray fail to load the config. tlsSettings must never contain the key.
+func TestBuildStreamSettingsTLSNoAllowInsecure(t *testing.T) {
+	stream := BuildStreamSettings(StreamOpts{Security: "tls", SNI: "example.com"})
+	ts := stream["tlsSettings"].(map[string]any)
+	if _, ok := ts["allowInsecure"]; ok {
+		t.Errorf("tlsSettings must not contain allowInsecure, got %v", ts)
+	}
+	if ts["serverName"] != "example.com" {
+		t.Errorf("serverName = %v", ts["serverName"])
+	}
+}
+
+// Nodes persisted before the fix have allowInsecure baked into their outbound.
+// BuildConfig must strip it so the generated config loads on the latest xray.
+func TestBuildConfigStripsAllowInsecure(t *testing.T) {
+	state := &model.PanelState{
+		Nodes: []model.Node{
+			{Tag: "node-7", Name: "T", Type: "trojan", Host: "1.2.3.4", Port: 443,
+				Outbound: map[string]any{
+					"protocol": "trojan",
+					"streamSettings": map[string]any{
+						"network":     "tcp",
+						"security":    "tls",
+						"tlsSettings": map[string]any{"allowInsecure": false, "serverName": "a.com"},
+					},
+				}},
+		},
+		Proxies: []model.Proxy{
+			{Tag: "proxy-0", Protocol: "vless", RawOutbound: map[string]any{
+				"protocol": "vless",
+				"streamSettings": map[string]any{
+					"security":    "tls",
+					"tlsSettings": map[string]any{"allowInsecure": true, "serverName": "b.com"},
+				},
+			}},
+		},
+		DefaultOutbound: "node-7",
+	}
+	cfg := BuildConfig(state)
+	for _, ob := range cfg["outbounds"].([]any) {
+		m := ob.(map[string]any)
+		ss, ok := m["streamSettings"].(map[string]any)
+		if !ok {
+			continue
+		}
+		ts, ok := ss["tlsSettings"].(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, bad := ts["allowInsecure"]; bad {
+			t.Errorf("outbound %v still has allowInsecure in tlsSettings", m["tag"])
+		}
+	}
+}
