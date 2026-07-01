@@ -120,6 +120,9 @@ func parseVMess(link string) (NodeRaw, error) {
 	if err := json.Unmarshal(raw, &v); err != nil {
 		return NodeRaw{}, fmt.Errorf("vmess JSON解析失败: %w", err)
 	}
+	if strings.TrimSpace(v.ID) == "" {
+		return NodeRaw{}, fmt.Errorf("vmess 缺少 UUID")
+	}
 	port := toInt(v.Port)
 	net := v.Net
 	if net == "" {
@@ -176,7 +179,11 @@ func parseVLess(link string) (NodeRaw, error) {
 	if sni == "" && security != "none" {
 		sni = host
 	}
-	outbound := BuildVLessOutbound(host, port, u.User.Username(), q.Get("flow"), StreamOpts{
+	uuid := u.User.Username()
+	if uuid == "" {
+		return NodeRaw{}, fmt.Errorf("vless 缺少 UUID")
+	}
+	outbound := BuildVLessOutbound(host, port, uuid, q.Get("flow"), StreamOpts{
 		Network:     net,
 		Security:    security,
 		SNI:         sni,
@@ -218,7 +225,11 @@ func parseTrojan(link string) (NodeRaw, error) {
 	if net == "" {
 		net = "tcp"
 	}
-	outbound := BuildTrojanOutbound(host, port, u.User.Username(), StreamOpts{
+	password := u.User.Username()
+	if password == "" {
+		return NodeRaw{}, fmt.Errorf("trojan 缺少密码")
+	}
+	outbound := BuildTrojanOutbound(host, port, password, StreamOpts{
 		Network:  net,
 		Security: "tls",
 		SNI:      sni,
@@ -275,6 +286,9 @@ func parseSS(link string) (NodeRaw, error) {
 	}
 	host := hostPort[0]
 	port := toInt(hostPort[1])
+	if method == "" || password == "" {
+		return NodeRaw{}, fmt.Errorf("ss 缺少加密方式或密码")
+	}
 	outbound := BuildSSOutbound(host, port, method, password)
 	name, _ := url.QueryUnescape(frag)
 	if name == "" {

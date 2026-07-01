@@ -77,3 +77,26 @@ func TestSkipUnsupported(t *testing.T) {
 	}
 	_ = nodes
 }
+
+// A subscription entry missing its UUID/password must be skipped, not stored:
+// an empty credential makes xray reject the whole config (invalid UUID).
+func TestParseLinksRejectsMissingCredential(t *testing.T) {
+	vmessNoID := "vmess://" + b64encodeGo(`{"ps":"x","add":"1.1.1.1","port":"443","id":"","net":"tcp"}`)
+	good := "vless://11111111-1111-1111-1111-111111111111@1.2.3.4:443?type=tcp&security=none#good"
+	links := []string{
+		"vless://1.2.3.4:443?type=tcp&security=none#nouuid", // no userinfo → empty UUID
+		"trojan://1.2.3.4:443#nopass",                       // no userinfo → empty password
+		vmessNoID,
+		good,
+	}
+	nodes, skipped := ParseLinks(links)
+	if len(nodes) != 1 {
+		t.Fatalf("expected 1 valid node, got %d: %+v", len(nodes), nodes)
+	}
+	if nodes[0].Name != "good" {
+		t.Errorf("kept node = %s, want good", nodes[0].Name)
+	}
+	if len(skipped) != 3 {
+		t.Errorf("expected 3 skipped, got %d", len(skipped))
+	}
+}

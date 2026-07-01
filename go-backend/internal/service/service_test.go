@@ -118,6 +118,49 @@ func TestBuildConfigWithBalancers(t *testing.T) {
 	}
 }
 
+// A node already persisted with an empty UUID/password would make the latest
+// xray reject the entire config. BuildConfig must skip such invalid outbounds
+// and never leave the default outbound pointing at a skipped tag.
+func TestBuildConfigSkipsInvalidOutbound(t *testing.T) {
+	state := &model.PanelState{
+		Nodes: []model.Node{
+			{Tag: "node-0", Type: "vless", Host: "1.1.1.1", Port: 443,
+				Outbound: map[string]any{
+					"protocol": "vless",
+					"settings": map[string]any{"vnext": []any{map[string]any{
+						"address": "1.1.1.1", "port": 443,
+						"users": []any{map[string]any{"id": "", "encryption": "none"}},
+					}}},
+				}},
+			{Tag: "node-1", Type: "vmess", Host: "2.2.2.2", Port: 443,
+				Outbound: map[string]any{
+					"protocol": "vmess",
+					"settings": map[string]any{"vnext": []any{map[string]any{
+						"address": "2.2.2.2", "port": 443,
+						"users": []any{map[string]any{"id": "valid-uuid"}},
+					}}},
+				}},
+		},
+		DefaultOutbound: "node-0", // points at the invalid node
+	}
+	cfg := BuildConfig(state)
+	tags := map[string]bool{}
+	for _, ob := range cfg["outbounds"].([]any) {
+		tags[ob.(map[string]any)["tag"].(string)] = true
+	}
+	if tags["node-0"] {
+		t.Error("invalid node-0 (empty uuid) should be skipped from outbounds")
+	}
+	if !tags["node-1"] {
+		t.Error("valid node-1 should remain in outbounds")
+	}
+	rules := cfg["routing"].(map[string]any)["rules"].([]any)
+	tail := rules[len(rules)-1].(map[string]any)
+	if tail["outboundTag"] == "node-0" {
+		t.Errorf("default outbound must not be the skipped node-0, got %v", tail["outboundTag"])
+	}
+}
+
 func TestBuildVMessOutbound(t *testing.T) {
 	ob := BuildVMessOutbound("1.2.3.4", 443, "test-uuid", StreamOpts{
 		Network: "ws", Security: "tls", SNI: "example.com", Path: "/ws",

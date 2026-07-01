@@ -2,6 +2,8 @@ package service
 
 import (
 	"encoding/json"
+	"log/slog"
+	"strings"
 
 	"xray-panel/internal/model"
 )
@@ -18,11 +20,21 @@ func BuildConfig(state *model.PanelState) map[string]any {
 		balancerTags[b.Tag] = true
 	}
 
+	// Outbounds missing their required credential (empty UUID/password) make the
+	// latest xray-core reject the whole config; skip them so one bad node parsed
+	// by older code can't take down every other node.
+	skipped := map[string]bool{}
+
 	var outbounds []any
 	for _, n := range state.Nodes {
 		ob := deepCopyMap(n.Outbound)
 		ob["tag"] = n.Tag
 		stripRemovedTLSFields(ob)
+		if !outboundHasCredential(ob) {
+			skipped[n.Tag] = true
+			slog.Warn("跳过缺少凭据的出站节点", "tag", n.Tag, "name", n.Name)
+			continue
+		}
 		outbounds = append(outbounds, ob)
 	}
 	for _, p := range state.Proxies {
@@ -41,6 +53,11 @@ func BuildConfig(state *model.PanelState) map[string]any {
 			}
 		}
 		ob["tag"] = p.Tag
+		if !outboundHasCredential(ob) {
+			skipped[p.Tag] = true
+			slog.Warn("跳过缺少凭据的落地代理", "tag", p.Tag, "name", p.Name)
+			continue
+		}
 		outbounds = append(outbounds, ob)
 	}
 	outbounds = append(outbounds,
@@ -50,7 +67,7 @@ func BuildConfig(state *model.PanelState) map[string]any {
 
 	var rules []any
 	for _, r := range state.Rules {
-		if !r.Enabled || r.Value == "" {
+		if !r.Enabled || r.Value == "" || skipped[r.Outbound] {
 			continue
 		}
 		rules = append(rules, RuleToXray(map[string]any{
@@ -62,8 +79,8 @@ func BuildConfig(state *model.PanelState) map[string]any {
 	})
 
 	defaultTag := state.DefaultOutbound
-	if defaultTag == "" && len(state.Nodes) > 0 {
-		defaultTag = state.Nodes[0].Tag
+	if defaultTag == "" || skipped[defaultTag] {
+		defaultTag = firstValidNodeTag(state, skipped)
 	}
 	tail := map[string]any{"type": "field", "network": "tcp,udp"}
 	if balancerTags[defaultTag] {
@@ -108,6 +125,59 @@ func BuildConfig(state *model.PanelState) map[string]any {
 	}
 
 	return cfg
+}
+
+// outboundHasCredential reports whether ob carries the credential its protocol
+// requires. A node/proxy persisted with an empty UUID/password makes the latest
+// xray-core reject the entire config ("invalid UUID"), so BuildConfig skips it.
+func outboundHasCredential(ob map[string]any) bool {
+	settings, _ := ob["settings"].(map[string]any)
+	if settings == nil {
+		return true
+	}
+	switch ob["protocol"] {
+	case "vmess", "vless":
+		v := firstInSlice(settings, "vnext")
+		if v == nil {
+			return false
+		}
+		users, _ := v["users"].([]any)
+		if len(users) == 0 {
+			return false
+		}
+		u, _ := users[0].(map[string]any)
+		id, _ := u["id"].(string)
+		return strings.TrimSpace(id) != ""
+	case "trojan", "shadowsocks":
+		s := firstInSlice(settings, "servers")
+		if s == nil {
+			return false
+		}
+		pw, _ := s["password"].(string)
+		return strings.TrimSpace(pw) != ""
+	default:
+		return true // socks/http/freedom/blackhole carry no such credential
+	}
+}
+
+// firstInSlice returns the first element of settings[key] as a map, or nil.
+func firstInSlice(settings map[string]any, key string) map[string]any {
+	arr, _ := settings[key].([]any)
+	if len(arr) == 0 {
+		return nil
+	}
+	m, _ := arr[0].(map[string]any)
+	return m
+}
+
+// firstValidNodeTag returns the tag of the first node not in skipped, or "".
+func firstValidNodeTag(state *model.PanelState, skipped map[string]bool) string {
+	for _, n := range state.Nodes {
+		if !skipped[n.Tag] {
+			return n.Tag
+		}
+	}
+	return ""
 }
 
 // stripRemovedTLSFields removes config keys that newer Xray-core versions have
