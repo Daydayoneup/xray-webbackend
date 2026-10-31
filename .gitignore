@@ -1,0 +1,11 @@
+.DS_Store
+__pycache__/
+data
+*.exe
+
+.superpowers/
+
+frontend/node_modules
+frontend/dist
+frontend_dist
+go-backend/data
