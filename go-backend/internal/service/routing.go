@@ -129,8 +129,11 @@ func joinShort(vals []string) string {
 // Describe 生成规则的人类可读描述。r 可以是内存中构建的规则，也可以是从 config.json 读回的规则。
 func Describe(r map[string]any) string {
 	if tag, _ := r["ruleTag"].(string); tag != "" {
-		if strings.Contains(tag, "分组「") { // 分组规则：「[名称 · ]分组「X」」
-			if len(strList(r["ip"])) > 0 {
+		if strings.Contains(tag, "分组「") { // 分组规则：「[名称 · ]分组「X」 · 域名|IP」
+			if strings.HasSuffix(tag, " · 域名") || strings.HasSuffix(tag, " · IP") || strings.Contains(tag, " · 域名 #") || strings.Contains(tag, " · IP #") {
+				return tag
+			}
+			if len(strList(r["ip"])) > 0 { // 旧版本生成的配置没有后缀
 				return tag + " · IP"
 			}
 			return tag + " · 域名"

@@ -46,7 +46,7 @@ func BuildStreamSettings(opts StreamOpts) map[string]any {
 			rs["serverName"] = opts.SNI
 		}
 		// reality 必须带 fingerprint，缺省用 chrome
-		rs["fingerprint"] = selStr(opts.Fingerprint, "chrome")
+		rs["fingerprint"] = selStr(XrayFingerprint(opts.Fingerprint), "chrome")
 		if opts.PublicKey != "" {
 			rs["publicKey"] = opts.PublicKey
 		}
@@ -69,8 +69,8 @@ func BuildStreamSettings(opts StreamOpts) map[string]any {
 		if sni != "" {
 			ts["serverName"] = sni
 		}
-		if opts.Fingerprint != "" {
-			ts["fingerprint"] = opts.Fingerprint
+		if fp := XrayFingerprint(opts.Fingerprint); fp != "" {
+			ts["fingerprint"] = fp
 		}
 		if alpn := splitList(opts.ALPN); len(alpn) > 0 {
 			ts["alpn"] = alpn
@@ -227,6 +227,39 @@ func BuildOutbound(s *model.OutboundSpec) map[string]any {
 	}
 }
 
+// xrayFingerprints 是 Xray 认识的 TLS 指纹名（uTLS 的 hello* 具体版本名另外放行）。
+var xrayFingerprints = map[string]bool{
+	"chrome": true, "firefox": true, "safari": true, "ios": true, "android": true, "edge": true,
+	"360": true, "qq": true, "random": true, "randomized": true, "randomizednoalpn": true, "unsafe": true,
+}
+
+// XrayFingerprint 把订阅中的指纹转换成 Xray 能识别的名字。Clash Meta 等客户端使用带版本号的写法
+// （如 chrome140），Xray 不认识会导致整个配置加载失败：去掉版本号；仍无法识别的按 chrome 处理。
+func XrayFingerprint(fp string) string {
+	fp = strings.ToLower(strings.TrimSpace(fp))
+	if fp == "" || xrayFingerprints[fp] || strings.HasPrefix(fp, "hello") {
+		return fp
+	}
+	if base := strings.TrimRight(fp, "0123456789_-."); xrayFingerprints[base] {
+		return base
+	}
+	return "chrome"
+}
+
+// ssOutboundMethods 是 Xray 出站支持的 Shadowsocks 加密方式（含别名）。
+// 新版 Xray 已不支持 none / plain 等不加密方式：机场常用这类节点在列表里展示“官网地址”等信息。
+var ssOutboundMethods = map[string]bool{
+	"aes-128-gcm": true, "aes-256-gcm": true, "aead_aes_128_gcm": true, "aead_aes_256_gcm": true,
+	"chacha20-poly1305": true, "chacha20-ietf-poly1305": true, "aead_chacha20_poly1305": true,
+	"xchacha20-poly1305": true, "xchacha20-ietf-poly1305": true, "aead_xchacha20_poly1305": true,
+	"2022-blake3-aes-128-gcm": true, "2022-blake3-aes-256-gcm": true, "2022-blake3-chacha20-poly1305": true,
+}
+
+// SupportedSSMethod 判断 Xray 是否支持该 Shadowsocks 加密方式。
+func SupportedSSMethod(m string) bool {
+	return ssOutboundMethods[strings.ToLower(strings.TrimSpace(m))]
+}
+
 // ValidateSpec 校验手动填写的出站参数，错误信息面向用户。
 func ValidateSpec(s *model.OutboundSpec) error {
 	if strings.TrimSpace(s.Host) == "" {
@@ -251,6 +284,9 @@ func ValidateSpec(s *model.OutboundSpec) error {
 	case "shadowsocks":
 		if s.Method == "" {
 			return fmt.Errorf("shadowsocks 需要选择加密方式")
+		}
+		if !SupportedSSMethod(s.Method) {
+			return fmt.Errorf("不支持的加密方式 %s", s.Method)
 		}
 		if strings.TrimSpace(s.UUID) == "" {
 			return fmt.Errorf("shadowsocks 需要填写密码")

@@ -316,11 +316,12 @@ func Build(state *model.PanelState, opts BuildOpts) BuildResult {
 				warn("规则 #%d 引用的分组「%s」是空的，已跳过", i+1, rs.Name)
 				continue
 			}
-			// 域名与 IP 必须分成两条规则：同一条规则里的 domain 和 ip 是“且”的关系
+			// 域名与 IP 必须分成两条规则：同一条规则里的 domain 和 ip 是“且”的关系。
+			// 两条的 ruleTag 必须不同（新版 Xray 拒绝重复的 ruleTag），分别以「 · 域名」「 · IP」结尾
 			for _, part := range []struct {
-				key  string
-				vals []string
-			}{{"domain", SetXrayDomains(rs)}, {"ip", rs.IPs}} {
+				key, label string
+				vals       []string
+			}{{"domain", "域名", SetXrayDomains(rs)}, {"ip", "IP", rs.IPs}} {
 				if len(part.vals) == 0 {
 					continue
 				}
@@ -328,6 +329,7 @@ func Build(state *model.PanelState, opts BuildOpts) BuildResult {
 				if r.Name != "" {
 					tag = r.Name + " · " + tag
 				}
+				tag += " · " + part.label
 				xr := map[string]any{"type": "field", "ruleTag": tag, part.key: part.vals}
 				if t := target(r.Outbound); balancerTags[t] {
 					xr["balancerTag"] = t
@@ -383,6 +385,7 @@ func Build(state *model.PanelState, opts BuildOpts) BuildResult {
 	}
 	rules = append(rules, tail)
 	res.RuleSource = append(src, 0)
+	uniqueRuleTags(rules, res.RuleSource)
 
 	// 6) 入站
 	inbounds := []any{}
@@ -500,6 +503,12 @@ func outboundHasCredential(ob map[string]any) bool {
 		if s == nil {
 			return false
 		}
+		if ob["protocol"] == "shadowsocks" {
+			// 不支持的加密方式（如 none）会让 Xray 整个配置加载失败，按无效节点处理
+			if m, _ := s["method"].(string); !SupportedSSMethod(m) {
+				return false
+			}
+		}
 		pw, _ := s["password"].(string)
 		return strings.TrimSpace(pw) != ""
 	default:
@@ -534,4 +543,32 @@ func deepCopyMap(src map[string]any) map[string]any {
 	var dst map[string]any
 	json.Unmarshal(data, &dst)
 	return dst
+}
+
+// uniqueRuleTags 保证 ruleTag 不重复（新版 Xray 遇到重复的 ruleTag 会拒绝启动）：
+// 旧数据中同名的规则在名称后加上路由页的规则序号区分。
+func uniqueRuleTags(rules []any, src []int) {
+	seen := map[string]bool{}
+	for i, x := range rules {
+		r, _ := x.(map[string]any)
+		tag, _ := r["ruleTag"].(string)
+		if tag == "" {
+			continue
+		}
+		if seen[tag] {
+			n := 0
+			if i < len(src) {
+				n = src[i]
+			}
+			base := tag
+			for k := 1; seen[tag]; k++ {
+				tag = fmt.Sprintf("%s #%d", base, n)
+				if k > 1 {
+					tag = fmt.Sprintf("%s #%d-%d", base, n, k)
+				}
+			}
+			r["ruleTag"] = tag
+		}
+		seen[tag] = true
+	}
 }

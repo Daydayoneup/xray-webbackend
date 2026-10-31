@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -37,9 +38,32 @@ func freePorts(n int) ([]int, error) {
 	return ports, nil
 }
 
+var badProbeTag = regexp.MustCompile(`tag probe-out-(\d+)`)
+
 // probeOutbounds 启动一个临时 Xray：每个出站配一个本地 HTTP 入站，
 // 再经由该入站请求 generate_204，得到“经过代理”的真实延迟。
+// 某个出站配置不被 Xray 接受（如订阅里的异常节点）时，Xray 会整体启动失败：
+// 从错误信息中找出该出站，记为不可用后去掉它重试，其余节点照常测速。
 func probeOutbounds(bin, workdir string, obs []map[string]any, timeout time.Duration) ([]*int, error) {
+	obs = append([]map[string]any(nil), obs...)
+	for attempt := 0; ; attempt++ {
+		res, err := probeOnce(bin, workdir, obs, timeout)
+		if err == nil || attempt >= len(obs) {
+			return res, err
+		}
+		m := badProbeTag.FindStringSubmatch(err.Error())
+		if m == nil {
+			return res, err
+		}
+		i, _ := strconv.Atoi(m[1])
+		if i < 0 || i >= len(obs) || obs[i] == nil {
+			return res, err
+		}
+		obs[i] = nil // 结果为 nil：不可用
+	}
+}
+
+func probeOnce(bin, workdir string, obs []map[string]any, timeout time.Duration) ([]*int, error) {
 	results := make([]*int, len(obs))
 	idx := []int{}
 	for i, ob := range obs {

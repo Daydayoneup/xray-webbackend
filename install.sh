@@ -61,9 +61,10 @@ case "$(uname -m)" in
 esac
 
 if command -v curl >/dev/null 2>&1; then
-  fetch() { curl -fsSL --retry 2 --connect-timeout 15 -o "$2" "$1"; }
+  # GitHub 连接经常短暂超时：多重试几次（连接失败也重试）
+  fetch() { curl -fsSL --retry 5 --retry-delay 3 --retry-connrefused --connect-timeout 15 -o "$2" "$1"; }
 elif command -v wget >/dev/null 2>&1; then
-  fetch() { wget -q -T 15 -O "$2" "$1"; }
+  fetch() { wget -q -T 15 -t 6 --waitretry=3 -O "$2" "$1"; }
 else
   die "需要 curl 或 wget"
 fi
@@ -81,13 +82,18 @@ trap 'rm -rf "$TMP"' EXIT
 # 发布包 = 面板 + 官方 Xray-core + 规则数据，只需下载这一个文件
 NAME="xray-panel-linux-$ARCH"
 ASSET="$NAME.tar.gz"
-echo "下载 $ASSET（$VERSION，内含官方 Xray-core）..."
-fetch "$BASE/$ASSET" "$TMP/$ASSET" || die "下载失败：$BASE/$ASSET
-  服务器访问 GitHub 不通时可加 GH_PROXY，例如：curl -fsSL ... | sudo GH_PROXY=https://gh-proxy.com/ bash"
+HAVE_SUM=0
+command -v sha256sum >/dev/null 2>&1 && HAVE_SUM=1
+# 先下载很小的校验文件：网络有问题时几秒内就能发现，不必等大文件下载完
 # 校验文件下载失败时停止安装（不跳过校验）；只有系统缺少 sha256sum 时才跳过
-if command -v sha256sum >/dev/null 2>&1; then
+if [ $HAVE_SUM -eq 1 ]; then
   fetch "$BASE/SHA256SUMS" "$TMP/SHA256SUMS" || die "下载校验文件 SHA256SUMS 失败，请重试
   服务器访问 GitHub 不稳定时可加 GH_PROXY，例如：curl -fsSL ... | sudo GH_PROXY=https://gh-proxy.com/ bash"
+fi
+echo "下载 $ASSET（$VERSION，内含官方 Xray-core，约 20MB）..."
+fetch "$BASE/$ASSET" "$TMP/$ASSET" || die "下载失败：$BASE/$ASSET
+  服务器访问 GitHub 不通时可加 GH_PROXY，例如：curl -fsSL ... | sudo GH_PROXY=https://gh-proxy.com/ bash"
+if [ $HAVE_SUM -eq 1 ]; then
   want=$(awk -v f="$ASSET" '$2 == f || $2 == "*"f {print $1}' "$TMP/SHA256SUMS")
   got=$(sha256sum "$TMP/$ASSET" | awk '{print $1}')
   [ -n "$want" ] && [ "$want" = "$got" ] || die "文件校验失败（SHA-256 不一致），请重试"

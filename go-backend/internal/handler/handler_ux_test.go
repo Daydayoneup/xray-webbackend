@@ -269,3 +269,17 @@ func TestStatusPasswordAndInstall(t *testing.T) {
 		t.Fatalf("install missing: %v", body)
 	}
 }
+
+func TestRoutingRejectsDuplicateRuleNames(t *testing.T) {
+	_, do := authed(t)
+	resp, body := do("PUT", "/api/routing", map[string]any{
+		"default_outbound": "direct",
+		"rules": []map[string]any{
+			{"name": "gfw", "type": "domain-suffix", "value": "a.com", "outbound": "direct", "enabled": true},
+			{"name": "gfw", "type": "domain-suffix", "value": "b.com", "outbound": "direct", "enabled": true},
+		},
+	})
+	if resp.StatusCode != 400 || !strings.Contains(fmt.Sprint(body["detail"]), "重复") {
+		t.Fatalf("want 400 duplicate name, got %d %v", resp.StatusCode, body)
+	}
+}

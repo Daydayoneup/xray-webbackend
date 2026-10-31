@@ -47,7 +47,15 @@ func (s *Server) PutRouting(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rules := []model.Rule{}
+	names := map[string]int{}
 	for i, r := range body.Rules {
+		if n := strings.TrimSpace(r.Name); n != "" {
+			if j, dup := names[n]; dup {
+				writeError(w, 400, fmt.Sprintf("规则 #%d 与规则 #%d 的名称「%s」重复", i+1, j, n))
+				return
+			}
+			names[n] = i + 1
+		}
 		if !valid[r.Outbound] {
 			writeError(w, 400, fmt.Sprintf("规则 #%d 的出口 %s 不存在", i+1, r.Outbound))
 			return

@@ -24,7 +24,7 @@ const form = reactive({ ...EMPTY })
 
 const protocols = ['socks', 'http', 'vmess', 'vless', 'trojan', 'shadowsocks']
 const ssMethods = ['aes-256-gcm', 'aes-128-gcm', 'chacha20-ietf-poly1305', 'xchacha20-ietf-poly1305',
-  '2022-blake3-aes-128-gcm', '2022-blake3-aes-256-gcm', '2022-blake3-chacha20-poly1305', 'none']
+  '2022-blake3-aes-128-gcm', '2022-blake3-aes-256-gcm', '2022-blake3-chacha20-poly1305']  // 新版 Xray 不支持 none
 const networkOpts = [['tcp', 'tcp'], ['ws', 'websocket'], ['grpc', 'gRPC'], ['h2', 'HTTP/2'], ['httpupgrade', 'HTTPUpgrade'], ['xhttp', 'XHTTP']]
 const fpOpts = ['chrome', 'firefox', 'safari', 'edge', 'ios', 'android', 'random', 'randomized']
 

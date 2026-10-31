@@ -138,3 +138,43 @@ func TestNamedRules(t *testing.T) {
 		t.Errorf("route test match = %d %q", r.UserRule, r.Match)
 	}
 }
+
+// 新版 Xray 拒绝重复的 ruleTag：分组规则拆出的两条、同名的规则都必须得到不同的 ruleTag。
+func TestRuleTagsUnique(t *testing.T) {
+	st := &model.PanelState{
+		Nodes:    []model.Node{{Tag: "node-a", Name: "A", Spec: testSpec}},
+		RuleSets: []model.RuleSet{{Tag: "set-0", Name: "GFWList", Domains: []string{"google.com"}, IPs: []string{"8.8.8.8/32"}}},
+		Rules: []model.Rule{
+			{Name: "gfw", Type: "set", Value: "set-0", Outbound: "node-a", Enabled: true},
+			{Name: "同名", Type: "domain-suffix", Value: "a.com", Outbound: "node-a", Enabled: true},
+			{Name: "同名", Type: "domain-suffix", Value: "b.com", Outbound: "direct", Enabled: true},
+		},
+		DefaultOutbound: "direct",
+	}
+	res := Build(st, BuildOpts{})
+	seen := map[string]bool{}
+	var tags []string
+	for _, x := range res.Config["routing"].(map[string]any)["rules"].([]any) {
+		r := x.(map[string]any)
+		tag, _ := r["ruleTag"].(string)
+		if tag == "" {
+			continue
+		}
+		if seen[tag] {
+			t.Fatalf("duplicate ruleTag %q in %v", tag, tags)
+		}
+		seen[tag] = true
+		tags = append(tags, tag)
+	}
+	want := []string{"gfw · 分组「GFWList」 · 域名", "gfw · 分组「GFWList」 · IP", "同名", "同名 #3"}
+	if strings.Join(tags, "|") != strings.Join(want, "|") {
+		t.Fatalf("tags = %q", tags)
+	}
+	if d := Describe(map[string]any{"ruleTag": tags[1], "ip": []string{"8.8.8.8/32"}}); d != "gfw · 分组「GFWList」 · IP" {
+		t.Errorf("Describe = %q", d)
+	}
+	// 旧版本生成的配置（无后缀）仍然按类型补上
+	if d := Describe(map[string]any{"ruleTag": "分组「GFWList」", "domain": []string{"domain:google.com"}}); d != "分组「GFWList」 · 域名" {
+		t.Errorf("legacy Describe = %q", d)
+	}
+}
