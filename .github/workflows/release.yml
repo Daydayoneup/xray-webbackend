@@ -1,7 +1,7 @@
 name: Release
 
 # 一个流程完成测试、构建与发布：
-#   推送 v* 标签（如 v1.0.0）→ 测试 → 构建单文件二进制（前端已内置）→ 推送多架构镜像 → 创建 GitHub Release
+#   推送 v* 标签（如 v1.0.0）→ 测试 → 构建单文件二进制（前端已内置）并与官方 Xray-core 打包 → 推送多架构镜像 → 创建 GitHub Release
 #     镜像标签：1.0.0、1.0、latest（预发布版本如 v1.1.0-rc1 只打 1.1.0-rc1，不更新 latest，Release 标记为预发布）
 #   推送 main 分支 → 测试 → 只推送镜像（标签 main、sha-xxxxxxx），不发布 Release
 #   手动运行（Actions 页面 → Release → Run workflow）→ 为已有标签重新发布（覆盖同名附件）
@@ -29,6 +29,8 @@ env:
   IMAGE_NAME: ${{ github.repository }}
   # 发布的标签：手动运行时为输入值，推送标签时为标签名，推送 main 时为空
   RELEASE_TAG: ${{ github.event.inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
+  # 打包进发布包的 Xray-core 版本：latest 为发布时的最新版，也可固定为如 v25.9.11
+  XRAY_VERSION: latest
 
 jobs:
   test:
@@ -59,6 +61,8 @@ jobs:
     needs: test
     if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    outputs:
+      xray_version: ${{ steps.xray.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -90,6 +94,37 @@ jobs:
           # 确认前端已嵌入、产物可以运行且版本号正确
           test -f go-backend/internal/webui/dist/index.html
           ./dist/xray-panel-linux-amd64 version | grep -q "${RELEASE_TAG}"
+
+      # 发布包内置官方 Xray-core 与规则数据：安装时只需下载一个文件，不再单独访问 XTLS 仓库
+      - name: 下载官方 Xray-core
+        id: xray
+        run: |
+          if [ "$XRAY_VERSION" = latest ]; then base=https://github.com/XTLS/Xray-core/releases/latest/download
+          else base=https://github.com/XTLS/Xray-core/releases/download/$XRAY_VERSION; fi
+          mkdir -p xray
+          for pair in amd64:64 arm64:arm64-v8a armv7:arm32-v7a; do
+            name=${pair%%:*}; asset=Xray-linux-${pair#*:}.zip
+            curl -fsSL --retry 3 -o "xray/$asset" "$base/$asset"
+            curl -fsSL --retry 3 -o "xray/$asset.dgst" "$base/$asset.dgst"
+            want=$(awk -F'=' '$1 == "SHA2-256" {gsub(/[ \r]/, "", $2); print $2}' "xray/$asset.dgst")
+            echo "$want  xray/$asset" | sha256sum -c -
+            mkdir -p "xray/$name"
+            unzip -q -o "xray/$asset" xray geoip.dat geosite.dat -d "xray/$name"
+          done
+          ver=$(./xray/amd64/xray version | head -1 | awk '{print $2}')
+          echo "Xray-core $ver"
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+
+      - name: 打包
+        run: |
+          for name in amd64 arm64 armv7; do
+            d=pkg/xray-panel-linux-$name
+            mkdir -p "$d"
+            cp "dist/xray-panel-linux-$name" "$d/xray-panel"
+            cp "xray/$name/xray" "xray/$name/geoip.dat" "xray/$name/geosite.dat" "$d/"
+            chmod 755 "$d/xray-panel" "$d/xray"
+            tar -C pkg -czf "dist/xray-panel-linux-$name.tar.gz" "xray-panel-linux-$name"
+          done
           cp install.sh dist/
           (cd dist && sha256sum xray-panel-* > SHA256SUMS)
           ls -l dist
@@ -176,6 +211,7 @@ jobs:
           IMAGE_TAGS: ${{ needs.image.outputs.tags }}
         run: |
           image=$(echo "$IMAGE_TAGS" | head -n1)
+          xray_ver="${{ needs.binaries.outputs.xray_version }}"
           cat > notes.md <<EOF
           ## 安装
 
@@ -192,7 +228,11 @@ jobs:
             -v /opt/xray-panel:/data/xray ${image}
           \`\`\`
 
-          附件为单文件程序（前端已内置），\`SHA256SUMS\` 为校验值。
+          附件说明：
+
+          - \`xray-panel-linux-<架构>.tar.gz\`：面板 + 官方 Xray-core ${xray_ver} + 规则数据（一键安装脚本使用）
+          - \`xray-panel-linux-<架构>\`：仅面板单文件（前端已内置），适合已有 Xray 的环境；缺少 Xray 时会自动从 GitHub 下载
+          - \`SHA256SUMS\`：校验值
 
           EOF
           pre=""

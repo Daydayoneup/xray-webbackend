@@ -38,7 +38,7 @@ func XrayBinName(goos string) string {
 }
 
 // DownloadXray 下载并安装最新版 Xray 到 dir，返回可执行文件路径。get 负责实际的 HTTP 下载；
-// ghProxy 为可选的 GitHub 加速前缀（如 https://ghfast.top/）。
+// ghProxy 为可选的 GitHub 加速前缀（如 https://gh-proxy.com/）。
 func DownloadXray(get func(url string) ([]byte, error), ghProxy, dir string) (string, error) {
 	asset, err := XrayReleaseAsset(runtime.GOOS, runtime.GOARCH)
 	if err != nil {

@@ -9,7 +9,7 @@
 # 可选环境变量：
 #   PANEL_PORT  面板端口，默认 2017（仅首次安装写入配置文件）
 #   VERSION     面板版本，默认 latest
-#   GH_PROXY    GitHub 加速前缀，如 https://ghfast.top/ （服务器访问 GitHub 慢或不通时使用）
+#   GH_PROXY    GitHub 加速前缀，如 https://gh-proxy.com/ （服务器访问 GitHub 慢或不通时使用；第三方服务，可用性以实际为准）
 #
 # 安装内容：
 #   /usr/local/bin/xray-panel             面板程序（前端已内置，单个文件）
@@ -78,21 +78,31 @@ fi
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
-ASSET="xray-panel-linux-$ARCH"
-echo "下载 $ASSET（$VERSION）..."
-fetch "$BASE/$ASSET" "$TMP/xray-panel" || die "下载失败：$BASE/$ASSET
-  服务器访问 GitHub 不通时可加 GH_PROXY，例如：curl -fsSL ... | sudo GH_PROXY=https://ghfast.top/ bash"
-if fetch "$BASE/SHA256SUMS" "$TMP/SHA256SUMS" 2>/dev/null && command -v sha256sum >/dev/null 2>&1; then
+# 发布包 = 面板 + 官方 Xray-core + 规则数据，只需下载这一个文件
+NAME="xray-panel-linux-$ARCH"
+ASSET="$NAME.tar.gz"
+echo "下载 $ASSET（$VERSION，内含官方 Xray-core）..."
+fetch "$BASE/$ASSET" "$TMP/$ASSET" || die "下载失败：$BASE/$ASSET
+  服务器访问 GitHub 不通时可加 GH_PROXY，例如：curl -fsSL ... | sudo GH_PROXY=https://gh-proxy.com/ bash"
+# 校验文件下载失败时停止安装（不跳过校验）；只有系统缺少 sha256sum 时才跳过
+if command -v sha256sum >/dev/null 2>&1; then
+  fetch "$BASE/SHA256SUMS" "$TMP/SHA256SUMS" || die "下载校验文件 SHA256SUMS 失败，请重试
+  服务器访问 GitHub 不稳定时可加 GH_PROXY，例如：curl -fsSL ... | sudo GH_PROXY=https://gh-proxy.com/ bash"
   want=$(awk -v f="$ASSET" '$2 == f || $2 == "*"f {print $1}' "$TMP/SHA256SUMS")
-  got=$(sha256sum "$TMP/xray-panel" | awk '{print $1}')
+  got=$(sha256sum "$TMP/$ASSET" | awk '{print $1}')
   [ -n "$want" ] && [ "$want" = "$got" ] || die "文件校验失败（SHA-256 不一致），请重试"
   echo "校验通过"
 else
-  yellow "未能校验 SHA-256（没有 sha256sum 或校验文件），继续安装"
+  yellow "系统没有 sha256sum，跳过 SHA-256 校验"
 fi
-chmod 755 "$TMP/xray-panel"
-NEW_VER=$("$TMP/xray-panel" version 2>/dev/null | awk '{print $NF}') || true
+tar -xzf "$TMP/$ASSET" -C "$TMP" || die "解压失败，请重试"
+PKG="$TMP/$NAME"
+for f in xray-panel xray geoip.dat geosite.dat; do
+  [ -f "$PKG/$f" ] || die "发布包中缺少 $f"
+done
+NEW_VER=$("$PKG/xray-panel" version 2>/dev/null | awk '{print $NF}') || true
 [ -n "$NEW_VER" ] || die "下载的程序无法运行（架构不匹配？）"
+XRAY_VER=$("$PKG/xray" version 2>/dev/null | head -1 | awk '{print $2}') || true
 
 UPGRADE=0
 [ -x "$BIN" ] && UPGRADE=1
@@ -106,10 +116,10 @@ if [ ! -f "$CONF" ]; then
 # 面板服务和 xray-panel 命令行（如 xray-panel passwd）都读取本文件
 PANEL_PORT=${PANEL_PORT:-2017}
 PANEL_DATA_DIR=$DATA_DIR
-# 面板安装的官方 Xray-core（升级面板时会一并更新到最新版）
+# 安装包内置的官方 Xray-core（升级面板时一并更新）
 XRAY_BIN=$DATA_DIR/bin/xray
 XRAY_LOCATION_ASSET=$DATA_DIR/bin
-# GitHub 加速前缀（下载 Xray、规则数据库时使用），如 https://ghfast.top/
+# GitHub 加速前缀（面板自动下载 Xray 时使用），如 https://gh-proxy.com/
 GH_PROXY=$GH_PROXY
 # 允许订阅地址指向内网 IP：SUBSCRIPTION_ALLOW_INTERNAL=1
 # 流量统计端口，0 关闭：METRICS_PORT=10085
@@ -117,11 +127,17 @@ EOF
   chmod 600 "$CONF"
 fi
 
-install -m 755 "$TMP/xray-panel" "$BIN"
+install -m 755 "$PKG/xray-panel" "$BIN"
 green "已安装 $NEW_VER → $BIN"
 
-# 安装 / 更新 Xray-core（失败不影响面板安装，面板启动后会自动重试，也可在顶栏点「重新下载」）
-GH_PROXY="$GH_PROXY" "$BIN" install-xray || yellow "Xray 安装失败，面板启动后会自动重试下载"
+# Xray-core 与规则数据放在数据目录 bin/（先写临时文件再改名，运行中的旧版本在重启后替换）
+mkdir -p "$DATA_DIR/bin"
+for f in xray geoip.dat geosite.dat; do
+  mode=644; [ "$f" = xray ] && mode=755
+  install -m $mode "$PKG/$f" "$DATA_DIR/bin/.$f.new"
+  mv -f "$DATA_DIR/bin/.$f.new" "$DATA_DIR/bin/$f"
+done
+green "已安装 Xray-core ${XRAY_VER:-} → $DATA_DIR/bin/xray"
 
 cat >"$UNIT" <<EOF
 [Unit]

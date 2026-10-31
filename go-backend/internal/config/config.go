@@ -26,7 +26,7 @@ type Settings struct {
 	MetricsPort int `env:"METRICS_PORT" envDefault:"10085"`
 	// XrayAssetDir 是镜像自带的 geo 数据目录；面板更新后的数据放在 $PANEL_DATA_DIR/geo 并优先使用
 	XrayAssetDir string `env:"XRAY_LOCATION_ASSET" envDefault:"/usr/local/share/xray"`
-	// GHProxy 是下载 GitHub Release（自动安装 Xray）时使用的加速前缀，如 https://ghfast.top/
+	// GHProxy 是下载 GitHub Release（自动安装 Xray）时使用的加速前缀，如 https://gh-proxy.com/
 	GHProxy string `env:"GH_PROXY"`
 
 	// ConfigFile 是实际读取的配置文件路径（不存在时为空）

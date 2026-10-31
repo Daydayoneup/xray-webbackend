@@ -70,7 +70,7 @@ func (a *App) InstallXray() error {
 	}
 	a.installMu.Unlock()
 	if err != nil {
-		slog.Error("自动安装 Xray 失败（可设置 GH_PROXY / HTTPS_PROXY 后在面板顶栏重试，或手动安装并设置 XRAY_BIN）", "error", err)
+		slog.Error("自动安装 Xray 失败（网络问题可在面板顶栏重试；或设置 GH_PROXY / HTTPS_PROXY 后重启面板；也可手动安装并设置 XRAY_BIN）", "error", err)
 		return err
 	}
 	if bin != a.config.XrayBin {

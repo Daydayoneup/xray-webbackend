@@ -106,8 +106,8 @@
 │           └── panel.js           # 面板状态管理
 ├── Dockerfile                     # 多阶段多架构构建: xray + node + go（交叉编译，前端嵌入）→ scratch
 ├── Makefile                       # make build：前端复制到 go-backend/internal/webui/dist 后构建单文件
-├── install.sh                     # 一键安装/升级/卸载：下载 Release 二进制 + install-xray + systemd
-├── .github/workflows/release.yml  # 唯一流程：测试 → v* 标签构建 linux amd64/arm64/armv7 二进制 + 推送多架构镜像（版本号/latest）→ 创建 Release；main 只推 main/sha 镜像
+├── install.sh                     # 一键安装/升级/卸载：下载 Release 发布包（面板 + 官方 Xray + geo，一个 tar.gz）+ systemd
+├── .github/workflows/release.yml  # 唯一流程：测试 → v* 标签构建 linux amd64/arm64/armv7 二进制并与官方 Xray-core（XRAY_VERSION，校验 .dgst）打包 tar.gz + 推送多架构镜像（版本号/latest）→ 创建 Release；main 只推 main/sha 镜像
 └── docker-compose.yml             # host 网络模式，挂载 ./data
 ```
 

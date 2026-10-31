@@ -49,11 +49,11 @@
 curl -fsSL https://raw.githubusercontent.com/Daydayoneup/xray-webbackend/main/install.sh | sudo bash
 ```
 
-脚本会下载面板和官方 Xray-core，注册为开机自启的 systemd 服务，最后打印访问地址和初始密码。
+脚本只下载一个发布包（面板 + 官方 Xray-core + 规则数据，约 30MB，校验 SHA-256），注册为开机自启的 systemd 服务，最后打印访问地址和初始密码。
 
-- **升级**：再执行一次同样的命令（Xray-core 也会更新到最新版）
+- **升级**：再执行一次同样的命令（Xray-core 一并更新为该版本内置的版本）
 - **指定端口 / 版本**：`curl -fsSL ... | sudo PANEL_PORT=8080 VERSION=v1.0.0 bash`
-- **访问 GitHub 慢**：`curl -fsSL ... | sudo GH_PROXY=https://ghfast.top/ bash`
+- **访问 GitHub 慢**：`curl -fsSL ... | sudo GH_PROXY=https://gh-proxy.com/ bash`（第三方加速服务，可用性以实际为准；不通时换其他加速地址）
 - **卸载**：`curl -fsSL ... | sudo bash -s -- uninstall`（保留数据，加 `--purge` 一并删除）
 - 配置文件 `/etc/xray-panel/config.env`，数据目录 `/var/lib/xray-panel`
 
@@ -108,7 +108,7 @@ docker build -t xray-panel .        # 或自行构建镜像
 git tag v1.0.0 && git push origin v1.0.0
 ```
 
-流程依次执行：测试 → 构建单文件二进制（linux amd64 / arm64 / armv7，附 `SHA256SUMS`）→ 推送多架构镜像 → 创建 GitHub Release（附安装说明与更新日志）。一键安装脚本默认下载最新的正式 Release。
+流程依次执行：测试 → 构建单文件二进制（linux amd64 / arm64 / armv7）→ 下载并校验官方 Xray-core，与面板打包为 `xray-panel-linux-<架构>.tar.gz`（附 `SHA256SUMS`）→ 推送多架构镜像 → 创建 GitHub Release（附安装说明与更新日志）。一键安装脚本默认下载最新的正式 Release。
 
 | 触发 | 二进制 / Release | 镜像标签 |
 |---|---|---|
@@ -146,7 +146,7 @@ make test   # 后端 go test + 前端 vitest
 | `PANEL_DATA_DIR` | `/data/xray` | 数据目录 |
 | `PANEL_PASSWORD` | 随机 | 首次启动时的登录密码（之后用面板或 `xray-panel passwd` 修改） |
 | `XRAY_BIN` | `/usr/local/bin/xray` | Xray 路径；不存在时依次查找数据目录的 `bin/xray`、PATH，都没有则自动下载 |
-| `GH_PROXY` | 空 | 自动下载 Xray 时的 GitHub 加速前缀，如 `https://ghfast.top/` |
+| `GH_PROXY` | 空 | 自动下载 Xray 时的 GitHub 加速前缀，如 `https://gh-proxy.com/`；修改后重启面板生效 |
 | `SOCKS_PORT` | `10808` | 默认 SOCKS 入站端口 |
 | `HTTP_PORT` | `10809` | 默认 HTTP 入站端口 |
 | `SUBSCRIPTION_ALLOW_INTERNAL` | `false` | 允许拉取内网订阅 |
