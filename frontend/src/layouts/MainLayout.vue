@@ -1,6 +1,8 @@
 <script setup>
 import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { apiError } from '../api/http.js'
 import { usePanel } from '../stores/panel.js'
 import { useAuth } from '../stores/auth.js'
 import { xrayApi } from '../api/index.js'
@@ -34,6 +36,24 @@ const STATE = {
   stopped: { text: 'Xray 未运行', type: 'info' },
 }
 const stateInfo = computed(() => STATE[panel.status.state] || STATE.stopped)
+// 找不到 Xray 时面板会自动下载官方版本
+const install = computed(() => panel.status.install || {})
+const installing = ref(false)
+async function retryInstall() {
+  installing.value = true
+  try { await xrayApi.install(); await panel.refreshStatus() } catch (e) { ElMessage.error(apiError(e)) } finally { installing.value = false }
+}
+// 下载中加快刷新，完成后立即显示运行状态
+let fastTimer = null
+watch(() => install.value.state, (st, old) => {
+  clearInterval(fastTimer)
+  if (st === 'installing') fastTimer = setInterval(poll, 3000)
+  if (old === 'installing' && st === 'done') panel.refreshStatus().catch(() => {})
+})
+const pwNoticeHidden = ref(sessionStorageGet('pw-notice-hidden') === '1')
+function hidePwNotice() { pwNoticeHidden.value = true; sessionStorageSet('pw-notice-hidden', '1') }
+function sessionStorageGet(k) { try { return sessionStorage.getItem(k) } catch (_) { return null } }
+function sessionStorageSet(k, v) { try { sessionStorage.setItem(k, v) } catch (_) {} }
 const warnings = computed(() => panel.status.warnings || [])
 // 运行时长随状态轮询刷新
 const uptime = computed(() => {
@@ -52,7 +72,7 @@ onMounted(() => {
   timer = setInterval(poll, 10000)
   window.addEventListener('resize', onResize)
 })
-onBeforeUnmount(() => { clearInterval(timer); window.removeEventListener('resize', onResize) })
+onBeforeUnmount(() => { clearInterval(timer); clearInterval(fastTimer); window.removeEventListener('resize', onResize) })
 
 async function apply() {
   applying.value = true
@@ -102,7 +122,14 @@ async function logout() { await auth.logout(); router.replace({ name: 'login' })
       <el-header class="top">
         <div class="status">
           <el-button v-if="narrow" size="small" text @click="menuOpen = !menuOpen">☰</el-button>
-          <el-tooltip :content="panel.status.last_exit ? `最近退出：${panel.status.last_exit}` : (panel.status.version || '')"
+          <el-tag v-if="install.state === 'installing'" type="warning" effect="dark">正在下载 Xray…</el-tag>
+          <template v-else-if="install.state === 'failed' && !panel.status.running">
+            <el-tooltip :content="install.error" placement="bottom">
+              <el-tag type="danger" effect="dark">Xray 下载失败</el-tag>
+            </el-tooltip>
+            <el-button size="small" type="primary" :loading="installing" @click="retryInstall">重新下载</el-button>
+          </template>
+          <el-tooltip v-else :content="panel.status.last_exit ? `最近退出：${panel.status.last_exit}` : (panel.status.version || '')"
                       :disabled="!panel.status.last_exit && !panel.status.version">
             <el-tag :type="stateInfo.type" effect="dark" class="clickable" @click="openLogs">{{ stateInfo.text }}</el-tag>
           </el-tooltip>
@@ -131,7 +158,19 @@ async function logout() { await auth.logout(); router.replace({ name: 'login' })
           <el-button size="small" text @click="logout">退出</el-button>
         </div>
       </el-header>
-      <el-main class="main"><router-view @changed="panel.refreshAll" /></el-main>
+      <el-main class="main">
+        <el-alert v-if="panel.status.password_initial && !pwNoticeHidden" type="warning" show-icon class="pw-notice"
+                  @close="hidePwNotice">
+          <template #title>
+            当前使用的是首次启动时自动生成的密码，建议尽快修改。
+            <router-link :to="{ path: '/settings', query: { tab: 'account' } }">去修改</router-link>
+          </template>
+        </el-alert>
+        <el-alert v-if="install.state === 'failed' && !panel.status.running" type="error" show-icon :closable="false" class="pw-notice"
+                  :title="`未找到 Xray，自动下载失败：${install.error}`"
+                  description="网络无法访问 GitHub 时，可设置环境变量 GH_PROXY（GitHub 加速前缀）或 HTTPS_PROXY 后重启面板，或手动安装 Xray 并设置 XRAY_BIN。" />
+        <router-view @changed="panel.refreshAll" />
+      </el-main>
     </el-container>
   </el-container>
 
@@ -179,6 +218,8 @@ async function logout() { await auth.logout(); router.replace({ name: 'login' })
 .dirty { color:var(--el-color-warning); font-weight:600; }
 .clean { color:var(--el-color-success); font-weight:500; }
 .main { background:var(--el-bg-color-page); }
+.pw-notice { margin-bottom:12px; }
+.pw-notice a { color:var(--el-color-primary); margin-left:6px; }
 .warn-list { margin:0; padding-left:18px; font-size:13px; line-height:1.7; }
 .log-tools { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
 .log-full { max-height:calc(100vh - 160px); }

@@ -67,3 +67,32 @@ func TestPaths(t *testing.T) {
 		t.Errorf("ConfigPath = %s", cfg.ConfigPath())
 	}
 }
+
+func TestLoadConfigFile(t *testing.T) {
+	path := t.TempDir() + "/config.env"
+	os.WriteFile(path, []byte("# 注释\nPANEL_PORT=4000\nexport PANEL_DATA_DIR=\"/var/lib/xp\"\nHTTP_PORT='1234'\nbad line\n"), 0600)
+	t.Setenv("PANEL_CONFIG", path)
+	t.Setenv("HTTP_PORT", "5555") // 环境变量优先
+	os.Unsetenv("PANEL_PORT")
+	os.Unsetenv("PANEL_DATA_DIR")
+	t.Cleanup(func() { os.Unsetenv("PANEL_PORT"); os.Unsetenv("PANEL_DATA_DIR") })
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.PanelPort != 4000 || cfg.DataDir != "/var/lib/xp" || cfg.HTTPPort != 5555 || cfg.ConfigFile != path {
+		t.Fatalf("got %+v", cfg)
+	}
+}
+
+func TestEmptyPasswordIsUnset(t *testing.T) {
+	t.Setenv("PANEL_CONFIG", t.TempDir()+"/none.env")
+	t.Setenv("PANEL_PASSWORD", "")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.PanelPassword != nil {
+		t.Fatal("empty PANEL_PASSWORD should be nil")
+	}
+}

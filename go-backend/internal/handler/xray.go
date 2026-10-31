@@ -26,7 +26,25 @@ func (s *Server) XrayStatus(w http.ResponseWriter, r *http.Request) {
 		"applied":    applied != nil,
 		"dirty":      dirty,
 		"warnings":   nonNil(res.Warnings),
+		"install":    s.App.XrayInstall(),
+		// 仍在使用自动生成的初始密码时，前端提醒修改
+		"password_initial": s.App.PasswordInitial(),
+		"panel_version":    s.App.Config().Version,
 	})
+}
+
+// InstallXray 在后台重新尝试自动安装 Xray（首次启动自动安装失败后，从顶栏重试）。
+func (s *Server) InstallXray(w http.ResponseWriter, r *http.Request) {
+	if s.App.Xray().Running() {
+		writeError(w, 400, "Xray 已在运行")
+		return
+	}
+	if st := s.App.XrayInstall(); st.State == "installing" {
+		writeJSON(w, 200, st)
+		return
+	}
+	go s.App.InstallXray()
+	writeJSON(w, 200, app.XrayInstallStatus{State: "installing"})
 }
 
 func nonNil(s []string) []string {

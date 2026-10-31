@@ -176,6 +176,7 @@ func (a *App) RunBackground(ctx context.Context) {
 			tick++
 			a.collectMetrics()
 			a.online.sweep(time.Now())
+			a.applyPasswordReset()
 			if tick%2 == 0 {
 				a.checkAlerts()
 			}

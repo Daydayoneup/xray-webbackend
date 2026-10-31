@@ -41,10 +41,19 @@ func hasGeoFiles(dir string) bool {
 	return dir != ""
 }
 
-// AssetDir 返回 Xray 使用的 geo 数据目录：面板下载的数据优先，否则用镜像自带的。
+// AssetDir 返回 Xray 使用的 geo 数据目录：面板下载的数据优先，其次镜像自带的，
+// 再次 Xray 同目录（自动安装的 Xray 自带 geo 数据）。
 func (a *App) AssetDir() string {
 	if a.config.DataDir != "" && hasGeoFiles(a.userGeoDir()) {
 		return a.userGeoDir()
+	}
+	if hasGeoFiles(a.config.XrayAssetDir) {
+		return a.config.XrayAssetDir
+	}
+	if a.config.XrayBin != "" {
+		if d := filepath.Dir(a.config.XrayBin); hasGeoFiles(d) {
+			return d
+		}
 	}
 	return a.config.XrayAssetDir
 }

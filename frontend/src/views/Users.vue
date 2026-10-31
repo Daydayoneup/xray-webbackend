@@ -157,7 +157,7 @@ async function copy(text) {
       </template></el-table-column>
       <el-table-column label="今日流量" width="110" align="right"><template #default="{ row }">
         {{ fmtBytes(row.today_up + row.today_down) }}</template></el-table-column>
-      <el-table-column label="近 30 天" width="130" align="right"><template #default="{ row }">
+      <el-table-column label="近 30 天" width="190" align="right"><template #default="{ row }">
         <div>{{ fmtBytes(row.month_up + row.month_down) }}</div>
         <div class="muted">↑ {{ fmtBytes(row.month_up) }} ↓ {{ fmtBytes(row.month_down) }}</div>
       </template></el-table-column>

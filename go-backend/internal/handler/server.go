@@ -1,14 +1,16 @@
 package handler
 
 import (
+	"io/fs"
+	"log/slog"
 	"net/http"
-	"os"
-	"path/filepath"
+	"path"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"xray-panel/internal/app"
 	"xray-panel/internal/middleware"
+	"xray-panel/internal/webui"
 )
 
 type Server struct {
@@ -71,6 +73,7 @@ func (s *Server) Routes() chi.Router {
 		r.Get("/api/xray/status", s.XrayStatus)
 		r.Post("/api/apply", s.Apply)
 		r.Post("/api/xray/restart", s.XrayRestart)
+		r.Post("/api/xray/install", s.InstallXray)
 		r.Get("/api/xray/logs", s.XrayLogs)
 		r.Get("/api/config", s.RawConfig)
 		r.Get("/api/config/draft", s.DraftConfig)
@@ -102,24 +105,42 @@ func (s *Server) Routes() chi.Router {
 		r.Get("/api/topology", s.Topology)
 	})
 
-	// SPA static file serving (mirrors Python _mount_static)
-	frontendDir := "frontend_dist"
-	if info, err := os.Stat(frontendDir); err == nil && info.IsDir() {
-		assetsDir := filepath.Join(frontendDir, "assets")
-		if info, err := os.Stat(assetsDir); err == nil && info.IsDir() {
-			fs := http.FileServer(http.Dir(assetsDir))
-			r.Handle("/assets/*", http.StripPrefix("/assets/", fs))
+	s.mountWeb(r)
+	return r
+}
+
+// mountWeb 提供前端页面：/assets/ 为带哈希的构建产物（长期缓存），其余非 API 路径返回 index.html（SPA）。
+func (s *Server) mountWeb(r chi.Router) {
+	web, embedded := webui.FS("frontend_dist")
+	if web == nil {
+		slog.Warn("没有找到前端文件（未嵌入，也没有 frontend_dist 目录），只提供 API")
+		return
+	}
+	if !embedded {
+		slog.Info("使用 frontend_dist 目录中的前端文件")
+	}
+	files := http.FileServerFS(web)
+	r.Handle("/*", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		p := strings.TrimPrefix(path.Clean(req.URL.Path), "/")
+		if strings.HasPrefix(p, "api/") {
+			writeError(w, 404, "not found")
+			return
 		}
-		// SPA fallback: non-/api/ paths → index.html
-		indexPath := filepath.Join(frontendDir, "index.html")
-		r.Handle("/*", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if strings.HasPrefix(r.URL.Path, "/api/") {
-				writeError(w, 404, "not found")
+		if p != "" && p != "index.html" {
+			if st, err := fs.Stat(web, p); err == nil && !st.IsDir() {
+				if strings.HasPrefix(p, "assets/") {
+					w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+				}
+				files.ServeHTTP(w, req)
 				return
 			}
-			http.ServeFile(w, r, indexPath)
-		}))
-	}
-
-	return r
+			if strings.HasPrefix(p, "assets/") {
+				http.NotFound(w, req)
+				return
+			}
+		}
+		// 前端路由与 index.html：不缓存，升级后立即加载新版本
+		w.Header().Set("Cache-Control", "no-cache")
+		http.ServeFileFS(w, req, web, "index.html")
+	}))
 }

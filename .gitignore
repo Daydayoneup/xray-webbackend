@@ -9,3 +9,12 @@ frontend/node_modules
 frontend/dist
 frontend_dist
 go-backend/data
+
+# 构建产物：make build 生成的二进制、嵌入二进制的前端
+/xray-panel
+/dist/
+go-backend/internal/webui/dist/*
+!go-backend/internal/webui/dist/.gitkeep
+
+.env
+.playwright-mcp/

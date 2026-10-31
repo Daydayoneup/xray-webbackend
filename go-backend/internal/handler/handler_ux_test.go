@@ -250,3 +250,22 @@ func TestRuleSetViewRefNames(t *testing.T) {
 		t.Errorf("ref rules = %+v", v.RefRules)
 	}
 }
+
+func TestFreshStateRoutingRulesArray(t *testing.T) {
+	_, do := authed(t)
+	_, body := do("GET", "/api/routing", nil)
+	if _, ok := body["rules"].([]any); !ok {
+		t.Fatalf("rules should be an array on a fresh install, got %#v", body["rules"])
+	}
+}
+
+func TestStatusPasswordAndInstall(t *testing.T) {
+	_, do := authed(t)
+	_, body := do("GET", "/api/xray/status", nil)
+	if body["password_initial"] != false {
+		t.Fatalf("PANEL_PASSWORD should not be initial: %v", body["password_initial"])
+	}
+	if _, ok := body["install"].(map[string]any); !ok {
+		t.Fatalf("install missing: %v", body)
+	}
+}

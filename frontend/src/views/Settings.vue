@@ -37,6 +37,7 @@ async function changePw() {
     if (data.token) setToken(data.token)
     Object.assign(pw, { old_password: '', new_password: '', confirm: '' })
     ElMessage.success('密码已修改，其他设备需要重新登录')
+    panel.refreshStatus().catch(() => {})
   } catch (e) { ElMessage.error(apiError(e)) }
 }
 
@@ -171,6 +172,9 @@ async function copy() {
           <el-form-item label="新密码"><el-input v-model="pw.new_password" type="password" show-password placeholder="至少 6 位" /></el-form-item>
           <el-form-item label="确认新密码"><el-input v-model="pw.confirm" type="password" show-password @keyup.enter="changePw" /></el-form-item>
           <el-form-item><el-button type="primary" @click="changePw">修改密码</el-button></el-form-item>
+          <el-form-item>
+            <span class="muted">忘记密码时在服务器上执行 <code>xray-panel passwd</code>（Docker：<code>docker exec xray-panel /xray-panel passwd</code>）重置。</span>
+          </el-form-item>
         </el-form>
         <h4>服务器地址</h4>
         <el-form label-width="100px" style="max-width:560px">

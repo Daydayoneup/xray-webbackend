@@ -3,7 +3,7 @@
 ## 项目概述
 
 轻量级 Xray-core 服务器管理面板，为 Xray-core 提供浏览器端的图形化管理界面。
-单二进制部署，Docker 镜像约 25MB，内存占用 10-20MB。
+单二进制部署（前端经 go:embed 嵌入），支持一键安装脚本（systemd）与 Docker 两种部署，内存占用 10-20MB。
 
 ## 技术栈
 
@@ -26,9 +26,13 @@
 
 ```
 ├── go-backend/                    # Golang 后端
-│   ├── cmd/server/main.go         # 入口：初始化 → 启动 xray → HTTP server → 优雅关闭
+│   ├── cmd/server/main.go         # 入口：子命令 passwd / install-xray / version；默认启动面板（找不到 Xray 时后台自动安装）
 │   └── internal/
-│       ├── config/config.go       # 环境变量配置 (Settings struct + env tags)
+│       ├── webui/webui.go         # go:embed 前端（dist/ 由构建流程填充，空时回退到 ./frontend_dist）
+│       ├── app/password.go        # 初始密码（initial-password.txt）、passwd 重置文件（password-reset.json）、初始密码提醒
+│       ├── app/xrayinstall.go     # ResolveXrayBin（XRAY_BIN → 数据目录 bin/xray → PATH）与自动安装状态
+│       ├── service/xrayinstall.go # 下载官方 Xray Release zip，校验 .dgst SHA-256，解压 xray + geo 数据
+│       ├── config/config.go       # 环境变量配置 (Settings struct + env tags)；可选 /etc/xray-panel/config.env（PANEL_CONFIG）
 │       ├── model/state.go         # 核心数据模型 (PanelState, Node, Proxy, Rule, Balancer, etc.)
 │       ├── model/api.go           # API 请求体 + validator 校验
 │       ├── store/store.go         # Store 接口 + JSON 持久化 + 旧格式向后兼容迁移
@@ -100,7 +104,10 @@
 │       └── stores/
 │           ├── auth.js            # 登录状态管理
 │           └── panel.js           # 面板状态管理
-├── Dockerfile                     # 多阶段构建: xray + go + node → scratch
+├── Dockerfile                     # 多阶段多架构构建: xray + node + go（交叉编译，前端嵌入）→ scratch
+├── Makefile                       # make build：前端复制到 go-backend/internal/webui/dist 后构建单文件
+├── install.sh                     # 一键安装/升级/卸载：下载 Release 二进制 + install-xray + systemd
+├── .github/workflows/release.yml  # 唯一流程：测试 → v* 标签构建 linux amd64/arm64/armv7 二进制 + 推送多架构镜像（版本号/latest）→ 创建 Release；main 只推 main/sha 镜像
 └── docker-compose.yml             # host 网络模式，挂载 ./data
 ```
 
@@ -233,7 +240,8 @@ type XrayProc interface {
 - Bearer Token 会话管理（7 天过期，内存存储）
 - 凭据文件 0600 权限
 - 订阅拉取 SSRF 防护
-- 支持环境变量/随机生成两种密码初始化方式
+- 支持环境变量/随机生成两种密码初始化方式；随机密码同时写入数据目录 `initial-password.txt`，`PasswordRec.Initial` 为真时前端提醒修改
+- 忘记密码：`xray-panel passwd [密码]` 只写 `password-reset.json`（哈希），运行中的面板在登录前 / 后台 30 秒周期 / 启动时读取生效并清空会话（不与运行中的面板争写 panel.json）
 
 ## API 路由
 
@@ -272,11 +280,16 @@ Go 测试覆盖 app、config、model、auth、store、handler、service；前端
 ## 部署
 
 ```bash
-docker compose up -d --build
+# 一键安装（systemd，不需要 Docker）：配置 /etc/xray-panel/config.env，数据 /var/lib/xray-panel
+curl -fsSL https://raw.githubusercontent.com/Daydayoneup/xray-webbackend/main/install.sh | sudo bash
+# Docker：compose 使用 CI 推送的 ghcr.io/daydayoneup/xray-webbackend 镜像，配置见 .env.example
+docker compose up -d
 # 访问 http://<IP>:2017
 ```
 
-关键环境变量：`TZ`（scratch 镜像已内嵌时区数据）、`PANEL_PORT`、`PANEL_PASSWORD`、`XRAY_BIN`、`PANEL_DATA_DIR`、`SUBSCRIPTION_ALLOW_INTERNAL`、`METRICS_PORT`（默认 10085，0 关闭流量统计）、`XRAY_LOCATION_ASSET`。
+找不到 Xray 时面板先启动、后台下载官方 Release 到 `$PANEL_DATA_DIR/bin`（geo 数据也在此，`AssetDir` 会回退到 Xray 同目录），顶栏显示进度/失败，可重试（`POST /api/xray/install`）。首次安装时 Xray 未运行，不能经本机代理，需 `GH_PROXY` 或 `HTTPS_PROXY`。
+
+关键环境变量：`TZ`（scratch 镜像已内嵌时区数据）、`PANEL_PORT`、`PANEL_PASSWORD`、`XRAY_BIN`、`PANEL_DATA_DIR`、`SUBSCRIPTION_ALLOW_INTERNAL`、`METRICS_PORT`（默认 10085，0 关闭流量统计）、`XRAY_LOCATION_ASSET`、`GH_PROXY`、`PANEL_CONFIG`。
 
 ## 代码规范
 

@@ -68,6 +68,7 @@ export const xrayApi = {
   status: () => http.get('/xray/status'),
   apply: () => http.post('/apply'),
   restart: () => http.post('/xray/restart'),
+  install: () => http.post('/xray/install'),
   logs: (n = 200) => http.get('/xray/logs', { params: { n } }),
   config: () => http.get('/config'),
   draft: () => http.get('/config/draft'),

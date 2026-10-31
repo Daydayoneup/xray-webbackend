@@ -73,7 +73,7 @@ a { color:var(--el-color-primary); text-decoration:none; }
 .stats div { display:flex; align-items:baseline; gap:6px; }
 .stats b { font-size:22px; color:var(--el-text-color-primary); }
 .stats span, .sub { font-size:12px; color:var(--el-text-color-secondary); }
-.bar-row { display:grid; grid-template-columns:minmax(0, 9em) 1fr 3em; align-items:center; gap:8px; font-size:13px;
+.bar-row { display:grid; grid-template-columns:minmax(0, 13em) 1fr 3em; align-items:center; gap:8px; font-size:13px;
            color:var(--el-text-color-regular); line-height:24px; }
 .bar-row:hover .lbl { color:var(--el-color-primary); }
 .lbl, .ell { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

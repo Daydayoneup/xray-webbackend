@@ -14,6 +14,7 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, "请求格式错误")
 		return
 	}
+	s.App.CheckPasswordReset()
 	if !auth.VerifyPassword(s.App.State().Password, body.Password) {
 		writeError(w, 401, "密码错误")
 		return
@@ -33,7 +34,7 @@ func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) Me(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, 200, map[string]bool{"ok": true})
+	writeJSON(w, 200, map[string]bool{"ok": true, "password_initial": s.App.PasswordInitial()})
 }
 
 func (s *Server) ChangePassword(w http.ResponseWriter, r *http.Request) {
@@ -46,13 +47,16 @@ func (s *Server) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, translateValidation(err))
 		return
 	}
+	s.App.Store().Lock()
+	defer s.App.Store().Unlock()
 	if !auth.VerifyPassword(s.App.State().Password, body.OldPassword) {
 		writeError(w, 400, "原密码错误")
 		return
 	}
-	rec, _ := auth.HashPassword(body.NewPassword)
-	s.App.State().Password = rec
-	s.App.Persist()
+	if err := s.App.SetPassword(body.NewPassword); err != nil {
+		writeError(w, 500, "保存失败: "+err.Error())
+		return
+	}
 	s.App.Sessions().Clear()
 	writeJSON(w, 200, map[string]any{
 		"ok":    true,

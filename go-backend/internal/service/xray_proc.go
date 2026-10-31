@@ -148,6 +148,9 @@ func (x *xrayProc) startLocked() {
 	done := make(chan struct{})
 	x.cmd, x.done, x.startedAt = cmd, done, time.Now()
 	go x.wait(cmd, done)
+	if x.version == "" { // 启动时还没安装 Xray（自动安装后首次启动）
+		go x.loadVersion()
+	}
 }
 
 func (x *xrayProc) wait(cmd *exec.Cmd, done chan struct{}) {

@@ -35,6 +35,8 @@ func (a *Auth) UnmarshalJSON(b []byte) error {
 type PasswordRec struct {
 	Salt string `json:"salt"`
 	Hash string `json:"hash"`
+	// Initial 表示仍是自动生成的初始密码（首次启动或 xray-panel passwd 随机生成），面板会提醒修改
+	Initial bool `json:"initial,omitempty"`
 }
 
 // SubUsage — 来自订阅响应头 subscription-userinfo 的流量/到期信息（字节 / Unix 秒）。

@@ -1,8 +1,6 @@
 package app
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -27,6 +25,10 @@ type Config struct {
 	DataDir                   string // 历史快照、geo 数据、流量统计的存放目录
 	MetricsPort               int
 	XrayAssetDir              string
+	XrayBin                   string // 实际使用的 Xray 路径（ResolveXrayBin 的结果）
+	XrayInstallDir            string // 找不到 Xray 时自动安装到这里
+	GHProxy                   string // 自动安装 Xray 时的 GitHub 加速前缀
+	Version                   string // 面板版本（构建时注入）
 }
 
 type App struct {
@@ -48,6 +50,9 @@ type App struct {
 	geoDB       *service.GeoDB
 	download    func(url string) ([]byte, error) // 可在测试中替换
 	fetchList   func(url string) ([]byte, error) // 远程规则列表下载，可在测试中替换
+
+	installMu sync.Mutex
+	install   XrayInstallStatus
 }
 
 func New(cfg Config) (*App, error) {
@@ -94,26 +99,6 @@ func (a *App) Build() service.BuildResult { return service.Build(a.state, a.Buil
 
 // SetFetcher 替换订阅拉取函数（测试用）。
 func (a *App) SetFetcher(f func(string, bool) (*service.FetchedSub, error)) { a.fetchSub = f }
-
-func (a *App) ensurePassword() {
-	if a.state.Password != nil {
-		return
-	}
-	pw := ""
-	src := "随机生成"
-	if a.config.Password != nil && *a.config.Password != "" {
-		pw = *a.config.Password
-		src = "环境变量 PANEL_PASSWORD"
-	} else {
-		b := make([]byte, 9)
-		rand.Read(b)
-		pw = hex.EncodeToString(b)
-	}
-	rec, _ := auth.HashPassword(pw)
-	a.state.Password = &model.PasswordRec{Salt: rec.Salt, Hash: rec.Hash}
-	a.store.Save(a.state)
-	slog.Info(fmt.Sprintf("面板登录密码(%s): %s", src, pw))
-}
 
 func (a *App) State() *model.PanelState     { return a.state }
 func (a *App) Sessions() *auth.SessionStore { return a.sessions }

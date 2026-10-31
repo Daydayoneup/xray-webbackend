@@ -11,10 +11,14 @@ import (
 
 func (s *Server) routingView() map[string]any {
 	st := s.App.State()
+	rules := st.Rules
+	if rules == nil { // 全新安装时为 nil，返回 [] 避免前端出错
+		rules = []model.Rule{}
+	}
 	return map[string]any{
 		"default_outbound": st.DefaultOutbound,
 		"domain_strategy":  selOr(st.DomainStrategy, service.DefaultDomainStrategy),
-		"rules":            st.Rules,
+		"rules":            rules,
 	}
 }
 

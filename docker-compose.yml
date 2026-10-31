@@ -1,19 +1,22 @@
+# 使用 GitHub Actions 构建好的镜像，服务器上不需要编译：
+#   docker compose up -d                       # 启动
+#   docker compose logs | grep 密码             # 查看首次启动生成的登录密码（也保存在 ./data/initial-password.txt）
+#   docker compose pull && docker compose up -d # 升级
+#   docker compose exec xray-panel /xray-panel passwd   # 忘记密码时重置
+#
+# 需要改端口等配置时：cp .env.example .env，按需修改（不建 .env 也能直接用默认值）。
 services:
-  xray-panel-go:
-    build: .
-    ports:
-      - "12017:2017"
-      - "10808:10808"
-      - "10809:10809"
-    image: xray-panel-go:local
-    container_name: xray-panel-go
+  xray-panel:
+    image: ghcr.io/daydayoneup/xray-webbackend:${PANEL_IMAGE_TAG:-latest}
+    container_name: xray-panel
     restart: always
+    # host 网络：在面板里新建的入站端口直接可用，不用再改端口映射
     network_mode: host
     environment:
-      - PANEL_DATA_DIR=/data/xray
-      - PANEL_PORT=2017
-      - PANEL_PASSWORD=123321123
-      - SUBSCRIPTION_ALLOW_INTERNAL=1
-      - TZ=Asia/Shanghai
+      - PANEL_PORT=${PANEL_PORT:-2017}
+      - PANEL_PASSWORD=${PANEL_PASSWORD:-}
+      - TZ=${TZ:-Asia/Shanghai}
+      - SUBSCRIPTION_ALLOW_INTERNAL=${SUBSCRIPTION_ALLOW_INTERNAL:-}
+      - METRICS_PORT=${METRICS_PORT:-10085}
     volumes:
-      - ./data:/data/xray
+      - ${PANEL_DATA:-./data}:/data/xray
